@@ -9,7 +9,8 @@ interface TeamCardProps {
   team: any;
   myShares: number;
   onTrade: (team: any) => void;
-  onSimWin: (id: number, name: string) => void;
+  // FIX 1: Add '?' to make this optional
+  onSimWin?: (id: number, name: string) => void;
 }
 
 export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCardProps) {
@@ -37,25 +38,21 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
       
       let rawData = data || [];
 
-      // Format Data
       let chartData = rawData.map((t: any) => ({
         label: new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         price: t.share_price
       }));
 
-      // Inject IPO Start
       if (chartData.length === 0) {
          chartData = [{ label: 'IPO', price: 10.00 }];
       } else {
          chartData.unshift({ label: 'IPO', price: 10.00 });
       }
 
-      // Inject Live Price
       chartData.push({ label: 'Now', price: currentPrice });
 
       setHistory(chartData);
 
-      // Calc Change
       const startPrice = chartData[0].price;
       const change = ((currentPrice - startPrice) / startPrice) * 100;
       setChangePercent(change);
@@ -87,7 +84,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
       className={`bg-gray-800 rounded-xl border border-gray-700 transition-all duration-300 shadow-lg overflow-visible ${isExpanded ? 'ring-2 ring-blue-500/50' : 'hover:border-blue-500'}`}
     >
       {/* --- HEADER --- */}
-      {/* FIX: Dynamic rounding based on isExpanded state */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
         className={`p-4 cursor-pointer bg-gray-800 hover:bg-gray-800/80 transition ${isExpanded ? 'rounded-t-xl' : 'rounded-xl'}`}
@@ -100,7 +96,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
         </div>
 
         <div className="flex items-center justify-between">
-           {/* Price + Change */}
            <div className="flex flex-col">
               <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Price</span>
               <div className="flex items-center gap-2">
@@ -108,13 +103,11 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
                     ${currentPrice.toFixed(2)}
                   </span>
                   
-                  {/* 24H Change Badge (Tooltip) */}
                   <div className="relative group cursor-help">
                       <div className={`flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                           {isPositive ? <TrendingUp size={10} className="mr-1"/> : <TrendingDown size={10} className="mr-1"/>}
                           {Math.abs(changePercent).toFixed(1)}%
                       </div>
-                      
                       <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black border border-gray-700 rounded text-[9px] text-white z-50 pointer-events-none whitespace-nowrap">
                           24h Price Change
                       </div>
@@ -122,7 +115,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
               </div>
            </div>
 
-           {/* Payout */}
            <div className="flex flex-col items-end">
               <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Payout/Win/Share</span>
               <div className="flex items-center gap-1 text-green-400">
@@ -146,7 +138,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
       {isExpanded && (
         <div className="px-4 pb-4 pt-0 animate-in fade-in slide-in-from-top-2 duration-200 bg-gray-800/50 rounded-b-xl">
             
-            {/* THE GRAPH */}
             <div className="h-40 w-full mt-2 mb-4">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={history}>
@@ -194,7 +185,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
 
             <div className="h-px bg-gray-700 mb-3"></div>
 
-            {/* Stats */}
             <div className="space-y-2 mb-4 text-xs">
                 <div className="flex justify-between">
                     <span className="text-gray-400">Total Supply</span>
@@ -232,12 +222,16 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
                 >
                 Trade
                 </button>
-                <button 
-                onClick={(e) => { e.stopPropagation(); onSimWin(team.id, team.name); }}
-                className="px-3 bg-gray-700 hover:bg-green-700 text-gray-400 hover:text-white rounded-lg text-xs uppercase font-bold transition"
-                >
-                Sim Win
-                </button>
+                
+                {/* FIX 2: Only show this button if onSimWin is provided */}
+                {onSimWin && (
+                    <button 
+                    onClick={(e) => { e.stopPropagation(); onSimWin(team.id, team.name); }}
+                    className="px-3 bg-gray-700 hover:bg-green-700 text-gray-400 hover:text-white rounded-lg text-xs uppercase font-bold transition"
+                    >
+                    Sim Win
+                    </button>
+                )}
             </div>
         </div>
       )}
