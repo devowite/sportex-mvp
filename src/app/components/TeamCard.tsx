@@ -98,7 +98,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
     loadData();
   }, [team.id, currentPrice, isExpanded, myShares, userId]); 
 
-  // --- VOLATILITY LOGIC (Crucial for the build error) ---
+  // --- VOLATILITY LOGIC ---
   let volatilityLabel = 'Neutral';
   let volatilityColor = 'text-yellow-500';
   let volatilityBg = 'bg-yellow-500/10 border-yellow-500/20';
@@ -133,7 +133,8 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
         className="p-4 cursor-pointer bg-gray-800 hover:bg-gray-800/80 transition"
       >
         <div className="flex justify-between items-start mb-3">
-             <div className="flex items-center gap-3">
+             <div className="flex items-start gap-3 w-full">
+                {/* TEAM LOGO (Fixed size) */}
                 <div className="h-12 w-12 bg-white/5 rounded-full p-0.5 flex items-center justify-center border border-white/10 shadow-inner flex-shrink-0">
                     <img 
                         src={logoUrl} 
@@ -143,29 +144,41 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
                     />
                 </div>
 
-                <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-white text-md truncate max-w-[120px]">{team.name}</h3>
-                        <span className="text-[10px] text-gray-500 font-mono bg-gray-900 px-1.5 py-0.5 rounded">
+                {/* TEAM INFO (Name wraps, Meta below) */}
+                <div className="flex flex-col w-full pr-2">
+                    {/* Name: Removed truncate, allowed wrap */}
+                    <h3 className="font-bold text-white text-md leading-tight mb-1">
+                        {team.name}
+                    </h3>
+                    
+                    {/* Meta Row: Record | Next Game */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Record Badge */}
+                        <span className="text-[10px] text-gray-500 font-mono bg-gray-900 px-1.5 py-0.5 rounded whitespace-nowrap">
                             {team.wins || 0}-{team.losses || 0}-{team.otl || 0}
                         </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5 text-[10px] text-blue-300">
-                        <CalendarClock size={12} />
-                        <span className="font-bold">{team.next_opponent || '--'}</span>
-                        <span className="text-gray-500">•</span>
-                        <span className="text-gray-400">{getNextGameText()}</span>
+                        
+                        <span className="text-gray-700 text-[10px] hidden sm:inline">•</span>
+
+                        {/* Next Game Info */}
+                        <div className="flex items-center gap-1.5 text-[10px] text-blue-300 whitespace-nowrap">
+                            <CalendarClock size={12} />
+                            <span className="font-bold">{team.next_opponent || '--'}</span>
+                            <span className="text-gray-400 hidden sm:inline">{getNextGameText()}</span>
+                            {/* Mobile short version of time if needed, currently reusing logic */}
+                        </div>
                     </div>
                 </div>
              </div>
 
-             <div className="text-gray-500 hover:text-white transition shrink-0 pt-2">
+             {/* Chevron (Aligned to top) */}
+             <div className="text-gray-500 hover:text-white transition shrink-0 pt-1 pl-1">
                 {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
              </div>
         </div>
 
-        <div className="flex items-center justify-between mt-2 pl-1">
+        {/* --- PRICE & PAYOUT ROW --- */}
+        <div className="flex items-center justify-between mt-3 pl-1">
            <div className="flex flex-col">
               <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Price</span>
               <div className="flex items-center gap-2">
@@ -275,7 +288,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
                     <span className="font-mono text-yellow-500">${team.dividend_bank.toFixed(2)}</span>
                 </div>
                 
-                {/* THIS WAS THE SECTION FAILING BEFORE */}
                 <div className="flex justify-between items-center relative z-10">
                     <div className="flex items-center gap-1 group cursor-help relative">
                         <span className="text-gray-400 border-b border-dotted border-gray-600">Liquidity (Reserve)</span>
