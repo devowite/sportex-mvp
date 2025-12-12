@@ -352,7 +352,8 @@ export default function Home() {
                                 <h3 className="text-gray-400 text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
                                     <Briefcase size={16} /> Your Portfolio
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+                                {/* FIX: CHANGED xl:grid-cols-4 TO lg:grid-cols-3 for 3-column max */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                                     {sortedOwned.map((team) => (
                                         <TeamCard 
                                             key={team.id}
@@ -360,8 +361,8 @@ export default function Home() {
                                             myShares={holdings[team.id]}
                                             onTrade={setSelectedTeam}
                                             onSimWin={user?.is_admin ? handleSimulateWin : undefined}
-											userId={user?.id}
-										/>
+                                            userId={user?.id}
+                                        />
                                     ))}
                                 </div>
                                 <div className="h-px bg-gray-800 w-full my-8"></div>
@@ -373,7 +374,8 @@ export default function Home() {
                             <h3 className="text-gray-400 text-sm font-bold uppercase tracking-wider mb-4">
                                 Explore Market ({sortedUnowned.length})
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+                            {/* FIX: CHANGED xl:grid-cols-4 TO lg:grid-cols-3 for 3-column max */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                                 {sortedUnowned.map((team) => (
                                     <TeamCard 
                                         key={team.id}
@@ -381,8 +383,8 @@ export default function Home() {
                                         myShares={0}
                                         onTrade={setSelectedTeam}
                                         onSimWin={user?.is_admin ? handleSimulateWin : undefined}
-										userId={user?.id}
-								   />
+                                        userId={user?.id}
+                                    />
                                 ))}
                             </div>
                         </div>
