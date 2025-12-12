@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation'; 
-// FIX: Consolidated all icon imports into one line
 import { LayoutGrid, Briefcase, User, Trophy, CircleDollarSign, ArrowUpDown, LogOut, Shield } from 'lucide-react';
 import TeamCard from './components/TeamCard';
 import TradeModal from './components/TradeModal';
@@ -269,7 +268,8 @@ export default function Home() {
                                 ? 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
                                 : 'bg-transparent text-gray-700 cursor-not-allowed'
                         }`}
-                    <div className="flex items-center gap-3">
+                    >
+                        <div className="flex items-center gap-3">
                             {/* LOGO ADDITION */}
                             {league === 'NHL' && (
                                 <img 
