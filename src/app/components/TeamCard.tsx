@@ -10,14 +10,14 @@ interface TeamCardProps {
   myShares: number;
   onTrade: (team: any) => void;
   onSimWin?: (id: number, name: string) => void;
-  userId?: string; // NEW: Needed to fetch personal cost basis
+  userId?: string;
 }
 
 export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: TeamCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [changePercent, setChangePercent] = useState(0);
-  const [avgCost, setAvgCost] = useState(0); // NEW: State for Average Cost
+  const [avgCost, setAvgCost] = useState(0);
 
   // --- MATH ---
   const currentPrice = 10.00 + (team.shares_outstanding * 0.01);
@@ -43,10 +43,10 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
     return `${dayName} ${timeStr}`;
   };
 
-  // --- DATA FETCHING (Graph + Cost Basis) ---
+  // --- DATA FETCHING ---
   useEffect(() => {
     const loadData = async () => {
-      // 1. Fetch Graph History (Global)
+      // 1. Graph Data
       const { data: graphData } = await supabase
         .from('transactions')
         .select('created_at, share_price')
@@ -72,7 +72,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
       const change = ((currentPrice - startPrice) / startPrice) * 100;
       setChangePercent(change);
 
-      // 2. Fetch Cost Basis (User Specific) - ONLY if owned
+      // 2. Cost Basis
       if (myShares > 0 && userId) {
         const { data: myBuys } = await supabase
             .from('transactions')
@@ -98,12 +98,24 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
     loadData();
   }, [team.id, currentPrice, isExpanded, myShares, userId]); 
 
-  // --- VISUALS ---
+  // --- VOLATILITY LOGIC (Crucial for the build error) ---
+  let volatilityLabel = 'Neutral';
+  let volatilityColor = 'text-yellow-500';
+  let volatilityBg = 'bg-yellow-500/10 border-yellow-500/20';
+
+  if (team.reserve_pool < 2000) {
+    volatilityLabel = 'High Volatility';
+    volatilityColor = 'text-red-400';
+    volatilityBg = 'bg-red-500/10 border-red-500/20';
+  } else if (team.reserve_pool > 8000) {
+    volatilityLabel = 'Stable';
+    volatilityColor = 'text-blue-400';
+    volatilityBg = 'bg-blue-500/10 border-blue-500/20';
+  }
+
   const isPositive = changePercent >= 0;
-  const graphColor = isPositive ? '#4ade80' : '#f87171'; 
-  
-  // Cost Basis Color Logic
   const isProfit = currentPrice >= avgCost;
+  const graphColor = isPositive ? '#4ade80' : '#f87171'; 
 
   return (
     <div 
@@ -188,7 +200,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
                         <span className="text-blue-300">Owned: <span className="font-bold text-white">{myShares}</span></span>
                         <span className="text-[10px] text-gray-500 ml-1">(Value: ${myTotalValue.toFixed(2)})</span>
                     </div>
-                    {/* NEW: Avg Cost Display */}
                     {avgCost > 0 && (
                         <div className="text-[10px]">
                             <span className="text-gray-500">Avg Cost: </span>
@@ -264,6 +275,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
                     <span className="font-mono text-yellow-500">${team.dividend_bank.toFixed(2)}</span>
                 </div>
                 
+                {/* THIS WAS THE SECTION FAILING BEFORE */}
                 <div className="flex justify-between items-center relative z-10">
                     <div className="flex items-center gap-1 group cursor-help relative">
                         <span className="text-gray-400 border-b border-dotted border-gray-600">Liquidity (Reserve)</span>
