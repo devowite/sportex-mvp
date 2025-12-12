@@ -8,6 +8,8 @@ import TeamCard from './components/TeamCard';
 import TradeModal from './components/TradeModal';
 import MarketStats from './components/MarketStats';
 import Portfolio from './components/Portfolio';
+import Profile from './components/Profile';     // NEW
+import WalletModal from './components/WalletModal'; // NEW
 
 export default function Home() {
   const router = useRouter();
@@ -18,6 +20,7 @@ export default function Home() {
   const [holdings, setHoldings] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState<any>(null);
+  const [isWalletOpen, setIsWalletOpen] = useState(false); // NEW: Wallet State
 
   // Market Stats State
   const [marketStats, setMarketStats] = useState({
@@ -36,7 +39,6 @@ export default function Home() {
   // --- 1. AUTH CHECK & DATA FETCHING ---
   useEffect(() => {
     const initSession = async () => {
-      // A. Check for Logged In User
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -44,14 +46,12 @@ export default function Home() {
         return;
       }
 
-      // B. Fetch Profile
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
         .single();
       
-      // Security: Force logout if user is deleted from DB but has browser session
       if (error || !profile) {
         await supabase.auth.signOut();
         router.push('/login');
@@ -60,14 +60,12 @@ export default function Home() {
       
       if (profile) setUser(profile);
 
-      // C. Fetch Teams
       const { data: teamData } = await supabase.from('teams').select('*').order('name');
       if (teamData) {
         setTeams(teamData);
-        calculateMarketStats(teamData); // Calculate stats on load
+        calculateMarketStats(teamData);
       }
 
-      // D. Fetch Holdings
       const { data: holdingsData } = await supabase
         .from('holdings')
         .select('team_id, shares_owned')
@@ -128,7 +126,7 @@ export default function Home() {
     });
   };
 
-  // RELOAD DATA HELPER (Re-fetches user balance and holdings after a trade)
+  // RELOAD DATA HELPER
   const reloadData = async () => {
     if (!user) return;
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
@@ -139,7 +137,6 @@ export default function Home() {
     if (holdingsData) holdingsData.forEach((h: any) => holdingsMap[h.team_id] = h.shares_owned);
     setHoldings(holdingsMap);
     
-    // Refresh Market Stats
     const { data: teamData } = await supabase.from('teams').select('*').order('name');
     if (teamData) {
         setTeams(teamData);
@@ -206,7 +203,7 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
       
-      {/* SIDEBAR 1 */}
+      {/* SIDEBAR */}
       <aside className="w-20 bg-gray-950 border-r border-gray-800 flex flex-col items-center py-6 gap-8 z-20 justify-between">
         <div className="flex flex-col items-center gap-8 w-full">
             <div className="h-10 w-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
@@ -222,33 +219,23 @@ export default function Home() {
                 <button onClick={() => setActiveTab('PROFILE')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition ${activeTab === 'PROFILE' ? 'bg-gray-800 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
                     <User size={24} /> <span className="text-[10px] font-bold">Profile</span>
                 </button>
-                
-                {/* ADMIN TAB LINK (Conditional) */}
                 {user?.is_admin && (
                     <button 
                         onClick={() => router.push('/admin')}
                         className="p-3 rounded-xl flex flex-col items-center gap-1 transition bg-red-900/20 text-red-400 hover:bg-red-900/40 hover:text-white mt-4 border border-red-900/50"
                     >
-                        <Shield size={24} /> 
-                        <span className="text-[10px] font-bold">Admin</span>
+                        <Shield size={24} /> <span className="text-[10px] font-bold">Admin</span>
                     </button>
                 )}
             </nav>
         </div>
-        
-        <button 
-            onClick={handleLogout} 
-            className="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-red-400 transition group"
-            title="Sign Out"
-        >
-            <div className="p-2 rounded-lg group-hover:bg-red-900/20 transition">
-                <LogOut size={20} />
-            </div>
+        <button onClick={handleLogout} className="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-red-400 transition group" title="Sign Out">
+            <div className="p-2 rounded-lg group-hover:bg-red-900/20 transition"><LogOut size={20} /></div>
             <span className="text-[9px] font-bold uppercase tracking-wide">Logout</span>
         </button>
       </aside>
 
-      {/* SIDEBAR 2 (MARKETS) */}
+      {/* MARKETS SUB-SIDEBAR */}
       {activeTab === 'MARKETS' && (
         <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-10">
             <div className="p-6 border-b border-gray-800">
@@ -270,14 +257,7 @@ export default function Home() {
                         }`}
                     >
                         <div className="flex items-center gap-3">
-                            {/* LOGO ADDITION */}
-                            {league === 'NHL' && (
-                                <img 
-                                    src="https://assets.nhle.com/logos/nhl/svg/NHL_light.svg" 
-                                    alt="NHL" 
-                                    className="h-6 w-6 object-contain"
-                                />
-                            )}
+                            {league === 'NHL' && (<img src="https://assets.nhle.com/logos/nhl/svg/NHL_light.svg" alt="NHL" className="h-6 w-6 object-contain" />)}
                             {league}
                         </div>
                         {league !== 'NHL' && <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-500">SOON</span>}
@@ -315,7 +295,12 @@ export default function Home() {
                     </div>
                 )}
             </div>
-            <div className="flex items-center gap-3 bg-gray-800 px-4 py-2 rounded-full border border-gray-700">
+            
+            {/* CLICKABLE BALANCE (OPENS WALLET) */}
+            <div 
+                onClick={() => setIsWalletOpen(true)}
+                className="flex items-center gap-3 bg-gray-800 px-4 py-2 rounded-full border border-gray-700 cursor-pointer hover:bg-gray-700 transition"
+            >
                 <CircleDollarSign size={16} className="text-green-400" />
                 <span className="font-mono font-bold text-green-400">${user ? user.usd_balance.toFixed(2) : '---'}</span>
             </div>
@@ -330,14 +315,17 @@ export default function Home() {
                     holdings={holdings} 
                     teams={teams} 
                 />
-            ) : 
-            
-            /* VIEW 2: MARKETS (NHL) */
-            activeTab === 'MARKETS' && selectedLeague === 'NHL' ? (
+            ) : activeTab === 'PROFILE' ? (
+                // VIEW 2: PROFILE
+                <Profile 
+                    user={user} 
+                    onOpenWallet={() => setIsWalletOpen(true)}
+                    onReload={reloadData}
+                />
+            ) : activeTab === 'MARKETS' && selectedLeague === 'NHL' ? (
+                // VIEW 3: MARKETS (NHL)
                 loading ? <p>Loading Data...</p> : (
                     <div className="space-y-6">
-                        
-                        {/* --- MARKET STATS BANNER --- */}
                         <MarketStats 
                             marketCap={marketStats.marketCap}
                             volume24hShares={marketStats.volume24hShares}
@@ -345,14 +333,11 @@ export default function Home() {
                             avgYield={marketStats.avgYield}
                             totalBank={marketStats.totalBank}
                         />
-
-                        {/* --- OWNED TEAMS --- */}
                         {sortedOwned.length > 0 && (
                             <div>
                                 <h3 className="text-gray-400 text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
                                     <Briefcase size={16} /> Your Portfolio
                                 </h3>
-                                {/* FIX: CHANGED xl:grid-cols-4 TO lg:grid-cols-3 for 3-column max */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                                     {sortedOwned.map((team) => (
                                         <TeamCard 
@@ -368,13 +353,8 @@ export default function Home() {
                                 <div className="h-px bg-gray-800 w-full my-8"></div>
                             </div>
                         )}
-
-                        {/* --- UNOWNED TEAMS --- */}
                         <div>
-                            <h3 className="text-gray-400 text-sm font-bold uppercase tracking-wider mb-4">
-                                Explore Market ({sortedUnowned.length})
-                            </h3>
-                            {/* FIX: CHANGED xl:grid-cols-4 TO lg:grid-cols-3 for 3-column max */}
+                            <h3 className="text-gray-400 text-sm font-bold uppercase tracking-wider mb-4">Explore Market ({sortedUnowned.length})</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                                 {sortedUnowned.map((team) => (
                                     <TeamCard 
@@ -391,8 +371,6 @@ export default function Home() {
                     </div>
                 )
             ) : (
-                
-                /* VIEW 3: PLACEHOLDER */
                 <div className="h-full flex flex-col items-center justify-center text-gray-500">
                     <Briefcase size={48} className="mb-4 opacity-20" />
                     <p className="text-lg">This section is under construction.</p>
@@ -408,6 +386,15 @@ export default function Home() {
             userShares={holdings[selectedTeam.id] || 0}
             onClose={() => setSelectedTeam(null)} 
             onConfirm={handleTrade}
+        />
+      )}
+
+      {/* WALLET MODAL */}
+      {isWalletOpen && user && (
+        <WalletModal 
+            balance={user.usd_balance}
+            onClose={() => setIsWalletOpen(false)}
+            onSuccess={reloadData}
         />
       )}
     </div>
