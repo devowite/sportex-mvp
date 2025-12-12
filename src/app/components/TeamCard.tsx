@@ -90,6 +90,10 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
       >
         <div className="flex justify-between items-center mb-3">
              <h3 className="font-bold text-white text-md truncate pr-2">{team.name}</h3>
+			 {/* RECORD DISPLAY */}
+<div className="text-[10px] text-gray-500 font-mono mt-0.5">
+    {team.wins || 0}-{team.losses || 0}-{team.otl || 0}
+</div>
              <div className="text-gray-500 hover:text-white transition shrink-0">
                 {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
              </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Shield, DollarSign, Users, Activity, Save, ArrowLeft } from 'lucide-react';
+import { Shield, DollarSign, Users, Activity, Save, ArrowLeft, Trash2 } from 'lucide-react';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -21,7 +21,6 @@ export default function AdminPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
 
-      // Verify Admin Status
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_admin')
@@ -29,7 +28,7 @@ export default function AdminPage() {
         .single();
 
       if (!profile?.is_admin) {
-        router.push('/'); // Kick non-admins out
+        router.push('/'); 
         return;
       }
 
@@ -47,23 +46,19 @@ export default function AdminPage() {
     const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
     setUsers(userData || []);
 
-    // 2. Calculate House Revenue (Approx 5% of Total Buy Volume)
+    // 2. Calculate House Revenue
     const { data: buys } = await supabase
         .from('transactions')
         .select('usd_amount')
         .eq('type', 'BUY');
     
     const totalBuyVolume = buys?.reduce((sum, t) => sum + t.usd_amount, 0) || 0;
-    // Math: Buying $100 stock means user paid ~$117 (if fees added on top) or $100 gross.
-    // For this MVP, we assume the transaction log records the gross amount.
-    // House fee is roughly 5% of volume.
     const houseRevenue = totalBuyVolume * 0.05;
 
     // 3. Calculate Liabilities
     const { data: teams } = await supabase.from('teams').select('reserve_pool, dividend_bank');
     const totalReserve = teams?.reduce((sum, t) => sum + t.reserve_pool, 0) || 0;
     const totalDivBank = teams?.reduce((sum, t) => sum + t.dividend_bank, 0) || 0;
-    
     const totalUserCash = userData?.reduce((sum, u) => sum + u.usd_balance, 0) || 0;
 
     setStats({
@@ -98,6 +93,22 @@ export default function AdminPage() {
         alert('Success: Balance updated.');
         setEditingUser(null);
         setAdjustAmount('');
+        fetchAdminData(); 
+    }
+  };
+
+  // --- NEW: DELETE USER FUNCTION ---
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`DANGER: Are you sure you want to DELETE ${userName}?\n\nThis will wipe their portfolio, transaction history, and balance. This cannot be undone.`)) return;
+
+    const { data, error } = await supabase.rpc('admin_delete_user', {
+        p_target_user_id: userId
+    });
+
+    if (error || (data && !data.success)) {
+        alert('Error: ' + (error?.message || data?.message));
+    } else {
+        alert('User deleted.');
         fetchAdminData(); // Refresh list
     }
   };
@@ -127,8 +138,6 @@ export default function AdminPage() {
 
       {/* STATS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        
-        {/* House Revenue */}
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10 text-green-500"><DollarSign size={64} /></div>
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total House Revenue</p>
@@ -138,7 +147,6 @@ export default function AdminPage() {
             <p className="text-xs text-gray-500 mt-2">Accumulated 5% fees from buys</p>
         </div>
 
-        {/* Total User Cash */}
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">User Cash Liability</p>
             <h2 className="text-2xl font-mono text-white font-bold">
@@ -147,7 +155,6 @@ export default function AdminPage() {
             <p className="text-xs text-gray-500 mt-2">Cash sitting in user wallets</p>
         </div>
 
-        {/* Market Liabilities */}
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Market Liability</p>
             <div className="space-y-1 mt-2">
@@ -162,16 +169,13 @@ export default function AdminPage() {
             </div>
         </div>
 
-        {/* System Health */}
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">System Health</p>
             <div className="mt-2 flex items-center gap-2">
                 <Activity size={20} className="text-green-500" />
                 <span className="text-lg font-bold text-green-500">Solvent</span>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-                Reserve Ratio: 85% (Fixed)
-            </p>
+            <p className="text-xs text-gray-500 mt-2">Reserve Ratio: 85% (Fixed)</p>
         </div>
       </div>
 
@@ -211,36 +215,50 @@ export default function AdminPage() {
                             ${u.usd_balance.toFixed(2)}
                         </td>
                         <td className="px-6 py-4 text-right">
-                            {editingUser === u.id ? (
-                                <div className="flex items-center justify-end gap-2">
-                                    <input 
-                                        type="number" 
-                                        placeholder="+/- Amount"
-                                        className="bg-gray-900 border border-gray-600 rounded px-2 py-1 w-24 text-white text-xs focus:border-blue-500 outline-none"
-                                        value={adjustAmount}
-                                        onChange={(e) => setAdjustAmount(e.target.value)}
-                                    />
+                            <div className="flex items-center justify-end gap-3">
+                                {/* EDIT BALANCE */}
+                                {editingUser === u.id ? (
+                                    <div className="flex items-center justify-end gap-2">
+                                        <input 
+                                            type="number" 
+                                            placeholder="+/- Amount"
+                                            className="bg-gray-900 border border-gray-600 rounded px-2 py-1 w-24 text-white text-xs focus:border-blue-500 outline-none"
+                                            value={adjustAmount}
+                                            onChange={(e) => setAdjustAmount(e.target.value)}
+                                        />
+                                        <button 
+                                            onClick={() => handleAdjustBalance(u.id)}
+                                            className="p-1.5 bg-green-600 hover:bg-green-500 text-white rounded transition"
+                                        >
+                                            <Save size={14} />
+                                        </button>
+                                        <button 
+                                            onClick={() => setEditingUser(null)}
+                                            className="p-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ) : (
                                     <button 
-                                        onClick={() => handleAdjustBalance(u.id)}
-                                        className="p-1.5 bg-green-600 hover:bg-green-500 text-white rounded transition"
+                                        onClick={() => { setEditingUser(u.id); setAdjustAmount(''); }}
+                                        className="text-xs font-bold text-blue-400 hover:text-white underline decoration-dotted underline-offset-4"
                                     >
-                                        <Save size={14} />
+                                        Adjust Balance
                                     </button>
+                                )}
+
+                                {/* DELETE USER BUTTON */}
+                                {!u.is_admin && (
                                     <button 
-                                        onClick={() => setEditingUser(null)}
-                                        className="p-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition"
+                                        onClick={() => handleDeleteUser(u.id, u.username || u.email)}
+                                        className="p-2 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition"
+                                        title="Delete User"
                                     >
-                                        ✕
+                                        <Trash2 size={16} />
                                     </button>
-                                </div>
-                            ) : (
-                                <button 
-                                    onClick={() => { setEditingUser(u.id); setAdjustAmount(''); }}
-                                    className="text-xs font-bold text-blue-400 hover:text-white underline decoration-dotted underline-offset-4"
-                                >
-                                    Adjust Balance
-                                </button>
-                            )}
+                                )}
+                            </div>
                         </td>
                     </tr>
                 ))}
