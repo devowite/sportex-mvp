@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ChevronDown, ChevronUp, HelpCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, HelpCircle, TrendingUp, TrendingDown, CalendarClock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface TeamCardProps {
   team: any;
   myShares: number;
   onTrade: (team: any) => void;
-  // FIX 1: Add '?' to make this optional
   onSimWin?: (id: number, name: string) => void;
 }
 
@@ -25,6 +24,23 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
     : 0;
   const myTotalPayout = myShares * estPayoutPerShare;
   const myTotalValue = myShares * currentPrice;
+
+  // --- DATE FORMATTER ---
+  const getNextGameText = () => {
+    if (!team.next_game_at) return 'TBD';
+    
+    const gameDate = new Date(team.next_game_at);
+    const today = new Date();
+    const isToday = gameDate.getDate() === today.getDate() && gameDate.getMonth() === today.getMonth();
+    
+    const timeStr = gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    
+    if (isToday) return `Tonight ${timeStr}`;
+    
+    // Otherwise return Day Name (e.g. "Mon 7:00 PM")
+    const dayName = gameDate.toLocaleDateString('en-US', { weekday: 'short' });
+    return `${dayName} ${timeStr}`;
+  };
 
   // --- FETCH HISTORY ---
   useEffect(() => {
@@ -88,18 +104,31 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
         onClick={() => setIsExpanded(!isExpanded)}
         className={`p-4 cursor-pointer bg-gray-800 hover:bg-gray-800/80 transition ${isExpanded ? 'rounded-t-xl' : 'rounded-xl'}`}
       >
-        <div className="flex justify-between items-center mb-3">
-             <h3 className="font-bold text-white text-md truncate pr-2">{team.name}</h3>
-			 {/* RECORD DISPLAY */}
-<div className="text-[10px] text-gray-500 font-mono mt-0.5">
-    {team.wins || 0}-{team.losses || 0}-{team.otl || 0}
-</div>
-             <div className="text-gray-500 hover:text-white transition shrink-0">
+        <div className="flex justify-between items-start mb-3">
+             <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-white text-md truncate pr-2">{team.name}</h3>
+                    {/* RECORD */}
+                    <span className="text-[10px] text-gray-500 font-mono bg-gray-900 px-1.5 py-0.5 rounded">
+                        {team.wins || 0}-{team.losses || 0}-{team.otl || 0}
+                    </span>
+                </div>
+                
+                {/* NEXT GAME INDICATOR */}
+                <div className="flex items-center gap-1.5 text-[10px] text-blue-300">
+                    <CalendarClock size={12} />
+                    <span className="font-bold">{team.next_opponent || '--'}</span>
+                    <span className="text-gray-500">•</span>
+                    <span className="text-gray-400">{getNextGameText()}</span>
+                </div>
+             </div>
+
+             <div className="text-gray-500 hover:text-white transition shrink-0 pt-1">
                 {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
              </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-2">
            <div className="flex flex-col">
               <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Price</span>
               <div className="flex items-center gap-2">
@@ -227,7 +256,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin }: TeamCard
                 Trade
                 </button>
                 
-                {/* FIX 2: Only show this button if onSimWin is provided */}
                 {onSimWin && (
                     <button 
                     onClick={(e) => { e.stopPropagation(); onSimWin(team.id, team.name); }}
