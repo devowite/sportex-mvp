@@ -272,8 +272,24 @@ export default function Home() {
                         }`}
                     >
                         <div className="flex items-center gap-3">
-                            {league === 'NHL' && (<img src="https://assets.nhle.com/logos/nhl/svg/NHL_light.svg" alt="NHL" className="h-6 w-6 object-contain" />)}
-                            {league === 'NFL' && (<img src="https://a.espncdn.com/i/teamlogos/nfl/500-dark/nfl.png" alt="NFL" className="h-6 w-6 object-contain" />)}
+                            {/* NHL LOGO */}
+                            {league === 'NHL' && (
+                                <img 
+                                    src="https://assets.nhle.com/logos/nhl/svg/NHL_light.svg" 
+                                    alt="NHL" 
+                                    className="h-6 w-6 object-contain" 
+                                />
+                            )}
+                            
+                            {/* NFL LOGO (New) */}
+                            {league === 'NFL' && (
+                                <img 
+                                    src="https://a.espncdn.com/i/teamlogos/nfl/500/nfl.png" 
+                                    alt="NFL" 
+                                    className="h-6 w-6 object-contain" 
+                                />
+                            )}
+                            
                             {league}
                         </div>
                         {!activeLeagues.includes(league) && <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-500">SOON</span>}
