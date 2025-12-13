@@ -60,54 +60,40 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
     try {
         const results = [];
         
-        if (team.league === 'NHL') {
-            // NHL API
-            const res = await fetch(`https://api-web.nhle.com/v1/club-schedule-season/${team.ticker}/now`);
-            const data = await res.json();
-            const games = data.games || [];
-            // Filter completed games, sort desc, take 5
-            const completed = games.filter((g: any) => g.gameState === 'FINAL').reverse().slice(0, 5);
-            
-            for (const g of completed) {
-                const isHome = g.homeTeam.abbrev === team.ticker;
-                const myScore = isHome ? g.homeTeam.score : g.awayTeam.score;
-                const oppScore = isHome ? g.awayTeam.score : g.homeTeam.score;
-                const oppTicker = isHome ? g.awayTeam.abbrev : g.homeTeam.abbrev;
-                
-                let result = 'L';
-                if (myScore > oppScore) result = 'W';
-                // Very basic OTL check (if game went to OT/SO but we lost)
-                if (myScore < oppScore && g.gameType > 2) result = 'OTL'; 
-
-                results.push({ opp: oppTicker, result, score: `${myScore}-${oppScore}` });
-            }
-        } else {
-            // NFL API (ESPN)
-            // Handle Ticker Mappings for ESPN
-            let searchTicker = team.ticker;
+        // 1. Determine Endpoint (Unified ESPN for both)
+        let sport = 'football/nfl';
+        if (team.league === 'NHL') sport = 'hockey/nhl';
+        
+        // 2. Ticker Mapping
+        let searchTicker = team.ticker;
+        if (team.league === 'NFL') {
             if(searchTicker === 'WSH') searchTicker = 'WAS';
-            if(searchTicker === 'JAX') searchTicker = 'JAC'; // ESPN uses JAC sometimes
+            if(searchTicker === 'JAX') searchTicker = 'JAC';
+        }
+        // (Add NHL specific maps here if needed, usually ESPN matches standard tickers)
 
-            const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${searchTicker}/schedule`);
-            const data = await res.json();
-            const events = data.events || [];
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/teams/${searchTicker}/schedule`);
+        const data = await res.json();
+        const events = data.events || [];
+        
+        // 3. Filter & Sort
+        const completed = events
+            .filter((e: any) => e.competitions[0].status.type.completed)
+            .reverse()
+            .slice(0, 5);
+
+        for (const e of completed) {
+            const game = e.competitions[0];
+            const myTeam = game.competitors.find((c: any) => c.team.abbreviation === searchTicker || c.team.id === team.id);
+            const oppTeam = game.competitors.find((c: any) => c.team.abbreviation !== searchTicker && c.team.id !== team.id);
             
-            // Filter completed
-            const completed = events.filter((e: any) => e.competitions[0].status.type.completed).reverse().slice(0, 5);
-
-            for (const e of completed) {
-                const game = e.competitions[0];
-                const myTeam = game.competitors.find((c: any) => c.team.abbreviation === searchTicker || c.team.id === team.id);
-                const oppTeam = game.competitors.find((c: any) => c.team.abbreviation !== searchTicker && c.team.id !== team.id);
-                
-                if (myTeam && oppTeam) {
-                    const isWin = myTeam.winner === true;
-                    results.push({ 
-                        opp: oppTeam.team.abbreviation, 
-                        result: isWin ? 'W' : 'L', 
-                        score: `${myTeam.score?.value}-${oppTeam.score?.value}` 
-                    });
-                }
+            if (myTeam && oppTeam) {
+                const isWin = myTeam.winner === true;
+                results.push({ 
+                    opp: oppTeam.team.abbreviation, 
+                    result: isWin ? 'W' : 'L', 
+                    score: `${myTeam.score?.value}-${oppTeam.score?.value}` 
+                });
             }
         }
         setLast5Games(results);
@@ -190,14 +176,16 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
 
   return (
     <div 
-      className={`bg-gray-800 rounded-xl border border-gray-700 transition-all duration-300 shadow-lg overflow-hidden ${isExpanded ? 'ring-2 ring-blue-500/50' : 'hover:border-blue-500'}`}
+      // FIX 1: Removed 'overflow-hidden' so tooltip can float outside
+      className={`bg-gray-800 rounded-xl border border-gray-700 transition-all duration-300 shadow-lg relative ${isExpanded ? 'ring-2 ring-blue-500/50' : 'hover:border-blue-500'}`}
     >
-      <div className="h-1.5 w-full" style={{ backgroundColor: team.color || '#374151' }}></div>
+      {/* FIX 2: Added 'rounded-t-xl' to keep top corners smooth */}
+      <div className="h-1.5 w-full rounded-t-xl" style={{ backgroundColor: team.color || '#374151' }}></div>
 
       {/* --- HEADER --- */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="p-4 cursor-pointer bg-gray-800 hover:bg-gray-800/80 transition"
+        className="p-4 cursor-pointer bg-gray-800 hover:bg-gray-800/80 transition rounded-b-xl" // Added rounded-b-xl for when closed
       >
         <div className="flex justify-between items-start mb-3">
              <div className="flex items-start gap-3 w-full">
@@ -232,7 +220,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
 
                         {/* --- LAST 5 FEATURE --- */}
                         <div 
-                            className="relative group ml-auto sm:ml-0"
+                            className="relative group ml-auto sm:ml-0 z-50"
                             onMouseEnter={handleLast5Hover}
                             onMouseLeave={() => setShowLast5(false)}
                         >
@@ -242,18 +230,18 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
 
                             {/* TOOLTIP WINDOW */}
                             {showLast5 && (
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-black border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                                    <div className="bg-gray-900 px-2 py-1 border-b border-gray-800 text-[10px] text-gray-400 font-bold text-center">
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-36 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl z-[100] overflow-hidden">
+                                    <div className="bg-black/50 px-2 py-1.5 border-b border-gray-700 text-[10px] text-gray-300 font-bold text-center uppercase tracking-wider">
                                         Recent Form
                                     </div>
                                     <div className="p-1 space-y-0.5">
                                         {loadingLast5 ? (
-                                            <p className="text-[9px] text-gray-500 text-center py-2">Loading...</p>
+                                            <p className="text-[9px] text-gray-500 text-center py-2 animate-pulse">Loading...</p>
                                         ) : last5Games.length > 0 ? (
                                             last5Games.map((g, i) => (
-                                                <div key={i} className="flex justify-between items-center text-[10px] px-2 py-0.5 rounded hover:bg-gray-800">
-                                                    <span className="text-gray-400 w-8">vs {g.opp}</span>
-                                                    <span className="text-gray-600 font-mono">{g.score}</span>
+                                                <div key={i} className="flex justify-between items-center text-[10px] px-2 py-1 rounded hover:bg-gray-800 transition">
+                                                    <span className="text-gray-400 w-10">vs {g.opp}</span>
+                                                    <span className="text-gray-500 font-mono text-[9px]">{g.score}</span>
                                                     <span className={`font-bold w-4 text-right ${
                                                         g.result === 'W' ? 'text-green-400' : 'text-red-400'
                                                     }`}>
@@ -262,7 +250,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
                                                 </div>
                                             ))
                                         ) : (
-                                            <p className="text-[9px] text-gray-500 text-center py-2">No data</p>
+                                            <p className="text-[9px] text-gray-500 text-center py-2">No recent games</p>
                                         )}
                                     </div>
                                 </div>
