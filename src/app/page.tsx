@@ -85,12 +85,12 @@ export default function Home() {
   }, [router]);
 
   // --- STATS CALCULATION HELPER ---
-  // Updated to accept a filtered list of teams so stats reflect the current league
   const calculateMarketStats = async (leagueTeams: any[]) => {
     let totalCap = 0;
     let totalBank = 0;
     let totalSupply = 0;
 
+    // 1. Calculate static stats from the filtered team list
     leagueTeams.forEach(t => {
       const price = 10.00 + (t.shares_outstanding * 0.01);
       totalCap += price * t.shares_outstanding;
@@ -100,14 +100,29 @@ export default function Home() {
 
     const avgYield = totalSupply > 0 ? (totalBank * 0.50) / totalSupply : 0;
 
-    // Fetch 24h Volume (This is still global for now, which is fine for MVP)
+    // 2. Fetch 24h Volume (FILTERED BY LEAGUE)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Create a list of IDs for the current league (e.g., all NFL team IDs)
+    const teamIds = leagueTeams.map(t => t.id);
+    
+    if (teamIds.length === 0) {
+        setMarketStats({
+            marketCap: totalCap,
+            totalBank: totalBank,
+            avgYield: avgYield,
+            volume24hShares: 0,
+            volume24hDollars: 0
+        });
+        return;
+    }
     
     const { data: volumeData } = await supabase
         .from('transactions')
         .select('shares_amount, usd_amount')
-        .gte('created_at', yesterday.toISOString());
+        .gte('created_at', yesterday.toISOString())
+        .in('team_id', teamIds); // <--- THIS FILTER FIXES THE ISSUE
     
     let volShares = 0;
     let volDollars = 0;
@@ -127,7 +142,6 @@ export default function Home() {
         volume24hDollars: volDollars
     });
   };
-
   // Recalculate stats whenever the league changes
   useEffect(() => {
     if (teams.length > 0) {
