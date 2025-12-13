@@ -22,9 +22,6 @@ export default function Home() {
   const [selectedTeam, setSelectedTeam] = useState<any>(null);
   const [isWalletOpen, setIsWalletOpen] = useState(false);
 
-  // NEW: State to store Live Scores
-  const [gameData, setGameData] = useState<Record<string, any>>({});
-
   // Market Stats State
   const [marketStats, setMarketStats] = useState({
     marketCap: 0,
@@ -86,107 +83,13 @@ export default function Home() {
     initSession();
   }, [router]);
 
-  // --- 2. FETCH LIVE SCORES (WITH NIGHT OWL LOGIC) ---
-  useEffect(() => {
-    const fetchLiveScores = async () => {
-        try {
-            let sportPath = 'hockey/nhl';
-            if(selectedLeague === 'NFL') sportPath = 'football/nfl';
-
-            const now = new Date();
-            const currentHour = now.getHours(); // 0-23
-            const isEarlyMorning = currentHour < 6; // true if 12:00 AM - 5:59 AM
-
-            let url = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/scoreboard`;
-            
-            // LOGIC A: If Early Morning, fetch Yesterday + Today
-            if (isEarlyMorning) {
-                const yesterday = new Date(now);
-                yesterday.setDate(yesterday.getDate() - 1);
-                const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
-                url += `?dates=${formatDate(yesterday)}-${formatDate(now)}`;
-            } 
-            // LOGIC B: If Daytime, just fetch standard (Today/Next) - No params needed
-
-            const res = await fetch(url);
-            const data = await res.json();
-            
-            const mapping: Record<string, any> = {};
-            let sortedEvents = data.events || [];
-
-            // SORTING PRIORITY:
-            if (isEarlyMorning) {
-                // STRATEGY: We want Yesterday to overwrite Today in the map.
-                // 1. Sort Newest (Today) to Oldest (Yesterday).
-                // 2. Loop processes Today first, then Yesterday.
-                // 3. Map key gets overwritten by Yesterday's data. Result: Yesterday Shows.
-                sortedEvents.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            } else {
-                // STRATEGY: We want Today to overwrite Yesterday (cleanup).
-                // 1. Sort Oldest to Newest.
-                // 2. Loop processes Yesterday first, then Today.
-                // 3. Map key gets overwritten by Today. Result: Today Shows.
-                sortedEvents.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            }
-
-            sortedEvents.forEach((event: any) => {
-                const competition = event.competitions[0];
-                const status = event.status.type.state; // 'pre', 'in', 'post'
-                const clock = event.status.displayClock;
-                const period = event.status.period;
-                const startTime = new Date(event.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-                // Safety: If it's daytime, don't show old final scores from yesterday if API returns them
-                const eventDate = new Date(event.date);
-                if (!isEarlyMorning && eventDate.getDate() < now.getDate() && status === 'post') {
-                    return; 
-                }
-
-                competition.competitors.forEach((c: any) => {
-                   const myTicker = c.team.abbreviation;
-                   const opponent = competition.competitors.find((o: any) => o.id !== c.id);
-                   
-                   mapping[myTicker] = {
-                       status,
-                       clock: status === 'in' ? `P${period} ${clock}` : status,
-                       startTime,
-                       score: c.score,
-                       opponent: opponent.team.abbreviation,
-                       opponentScore: opponent.score
-                   };
-
-                   // Ticker Normalization
-                   if(myTicker === 'WSH') mapping['WAS'] = mapping['WSH'];
-                   if(myTicker === 'JAX') mapping['JAC'] = mapping['JAX'];
-                   if(myTicker === 'LAR') mapping['LA'] = mapping['LAR'];
-                   if(myTicker === 'TBL') mapping['TB'] = mapping['TBL'];
-                   if(myTicker === 'SJS') mapping['SJ'] = mapping['SJS'];
-                   if(myTicker === 'NJD') mapping['NJ'] = mapping['NJD'];
-                   if(myTicker === 'MTL') mapping['MON'] = mapping['MTL'];
-                   if(myTicker === 'UTAH') mapping['UTA'] = mapping['UTAH'];
-                });
-            });
-
-            setGameData(mapping);
-        } catch (e) {
-            console.error("ESPN Fetch Error", e);
-        }
-    };
-
-    if(activeTab === 'MARKETS') {
-        fetchLiveScores();
-        const interval = setInterval(fetchLiveScores, 30000);
-        return () => clearInterval(interval);
-    }
-
-  }, [selectedLeague, activeTab]);
-
   // --- STATS CALCULATION HELPER ---
   const calculateMarketStats = async (leagueTeams: any[]) => {
     let totalCap = 0;
     let totalBank = 0;
     let totalSupply = 0;
 
+    // 1. Calculate static stats from the filtered team list
     leagueTeams.forEach(t => {
       const price = 10.00 + (t.shares_outstanding * 0.01);
       totalCap += price * t.shares_outstanding;
@@ -196,9 +99,11 @@ export default function Home() {
 
     const avgYield = totalSupply > 0 ? (totalBank * 0.50) / totalSupply : 0;
 
+    // 2. Fetch 24h Volume (FILTERED BY LEAGUE)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     
+    // Create a list of IDs for the current league (e.g., all NFL team IDs)
     const teamIds = leagueTeams.map(t => t.id);
     
     if (teamIds.length === 0) {
@@ -237,6 +142,7 @@ export default function Home() {
     });
   };
   
+  // Recalculate stats whenever the league changes
   useEffect(() => {
     if (teams.length > 0) {
         const leagueTeams = teams.filter(t => t.league === selectedLeague);
@@ -261,6 +167,7 @@ export default function Home() {
     }
   };
 
+  // --- ADMIN SIMULATION ---
   const handleSimulateWin = async (teamId: number, teamName: string) => {
     if (!user?.is_admin) return;
     if (!confirm(`ADMIN: Simulate a WIN for ${teamName}?`)) return;
@@ -358,6 +265,7 @@ export default function Home() {
                         }`}
                     >
                         <div className="flex items-center gap-3">
+                            {/* NHL LOGO */}
                             {league === 'NHL' && (
                                 <img 
                                     src="https://assets.nhle.com/logos/nhl/svg/NHL_light.svg" 
@@ -365,6 +273,7 @@ export default function Home() {
                                     className="h-6 w-6 object-contain" 
                                 />
                             )}
+                            {/* NFL LOGO */}
                             {league === 'NFL' && (
                                 <img 
                                     src="https://upload.wikimedia.org/wikipedia/en/a/a2/National_Football_League_logo.svg" 
@@ -411,6 +320,7 @@ export default function Home() {
                 )}
             </div>
             
+            {/* CLICKABLE BALANCE */}
             <div 
                 onClick={() => setIsWalletOpen(true)}
                 className="flex items-center gap-3 bg-gray-800 px-4 py-2 rounded-full border border-gray-700 cursor-pointer hover:bg-gray-700 transition"
@@ -422,6 +332,7 @@ export default function Home() {
 
         <div className="flex-1 overflow-y-auto p-8">
             
+            {/* VIEW 1: PORTFOLIO */}
             {activeTab === 'PORTFOLIO' ? (
                 <Portfolio 
                     user={user} 
@@ -429,12 +340,14 @@ export default function Home() {
                     teams={teams} 
                 />
             ) : activeTab === 'PROFILE' ? (
+                // VIEW 2: PROFILE
                 <Profile 
                     user={user} 
                     onOpenWallet={() => setIsWalletOpen(true)}
                     onReload={reloadData}
                 />
             ) : activeTab === 'MARKETS' ? (
+                // VIEW 3: MARKETS
                 loading ? <p>Loading Data...</p> : (
                     <div className="space-y-6">
                         <MarketStats 
@@ -458,7 +371,6 @@ export default function Home() {
                                             onTrade={setSelectedTeam}
                                             onSimWin={user?.is_admin ? handleSimulateWin : undefined}
                                             userId={user?.id}
-                                            liveGame={gameData[team.ticker]} // ADDED: Passing live score data
                                         />
                                     ))}
                                 </div>
@@ -476,7 +388,6 @@ export default function Home() {
                                         onTrade={setSelectedTeam}
                                         onSimWin={user?.is_admin ? handleSimulateWin : undefined}
                                         userId={user?.id}
-                                        liveGame={gameData[team.ticker]} // ADDED: Passing live score data
                                     />
                                 ))}
                             </div>
@@ -497,8 +408,8 @@ export default function Home() {
             team={selectedTeam} 
             isOpen={true} 
             userId={user?.id}
-            userBalance={user?.usd_balance || 0}
-            userShares={holdings[selectedTeam.id] || 0}
+            userBalance={user?.usd_balance || 0} // Fix: Pass balance directly
+            userShares={holdings[selectedTeam.id] || 0} // Fix: Pass shares directly
             onClose={() => setSelectedTeam(null)} 
             onSuccess={reloadData} 
         />
