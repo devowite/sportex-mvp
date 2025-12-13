@@ -272,9 +272,10 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
     setLoadingNext5(false);
   };
 
-  // --- GRAPH DATA ---
+  // --- GRAPH DATA & AVG COST ---
   useEffect(() => {
     const loadData = async () => {
+      // 1. Fetch Graph Data
       const { data: graphData } = await supabase
         .from('transactions')
         .select('created_at, share_price')
@@ -300,8 +301,8 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
       const change = ((currentPrice - startPrice) / startPrice) * 100;
       setChangePercent(change);
 
+      // 2. Calculate Avg Cost (Weighted)
       if (myShares > 0 && userId) {
-        // Fetch ALL transactions (BUY and SELL) ordered by time
         const { data: allTeamTxs } = await supabase
             .from('transactions')
             .select('type, usd_amount, shares_amount')
@@ -318,15 +319,12 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
                     currentHoldings += t.shares_amount;
                     currentTotalCost += t.usd_amount;
                 } else if (t.type === 'SELL') {
-                    // When selling, we reduce the Total Cost proportionally
-                    // This preserves the "Average Cost" of the remaining shares
                     const avgCostAtSale = currentHoldings > 0 ? currentTotalCost / currentHoldings : 0;
                     currentTotalCost -= (avgCostAtSale * t.shares_amount);
                     currentHoldings -= t.shares_amount;
                 }
             });
 
-            // Handle tiny floating point errors or zero
             if (currentHoldings > 0) {
                 setAvgCost(currentTotalCost / currentHoldings);
             } else {
@@ -334,11 +332,10 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
             }
         }
       }
-      }
     };
     loadData();
-  }, [team.id, currentPrice, myShares, userId]); 
-
+  }, [team.id, currentPrice, myShares, userId]);
+  
   // Volatility Logic
   let volatilityLabel = 'Neutral';
   let volatilityColor = 'text-yellow-500';
