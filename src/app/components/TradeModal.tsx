@@ -9,17 +9,21 @@ interface TradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;       
-  userBalance: number;  // Passed from parent (Instant)
-  userShares: number;   // Passed from parent (Instant)
+  userBalance: number;  
+  userShares: number;   
   onSuccess?: () => void;
 }
 
 export default function TradeModal({ team, isOpen, onClose, userId, userBalance, userShares, onSuccess }: TradeModalProps) {
   const [mode, setMode] = useState<'BUY' | 'SELL'>('BUY');
-  const [amount, setAmount] = useState<number | ''>(''); // Allow empty string for better typing UX
+  const [amount, setAmount] = useState<number | ''>(''); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Local state to track balance updates immediately after a trade
+  const [currentBalance, setCurrentBalance] = useState(userBalance);
+  const [currentShares, setCurrentShares] = useState(userShares);
+
   // Market Security State
   const [marketStatus, setMarketStatus] = useState<'OPEN' | 'CLOSED' | 'LOADING'>('LOADING');
   const [marketMessage, setMarketMessage] = useState('');
@@ -33,49 +37,50 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
     let startSupply = team.shares_outstanding;
     let endSupply = tradeMode === 'BUY' ? startSupply + qty : startSupply - qty;
     
-    // Safety
     if (endSupply < 0) endSupply = 0;
 
     let firstSharePrice = 0;
     let lastSharePrice = 0;
 
     if (tradeMode === 'BUY') {
-        // Price of next share (S+1)
         firstSharePrice = 10.00 + ((startSupply + 1) * 0.01);
-        // Price of last share (S+k)
         lastSharePrice = 10.00 + (endSupply * 0.01);
     } else {
-        // Selling: Price of current share (S)
         firstSharePrice = 10.00 + (startSupply * 0.01);
-        // Price of last share sold (S-k+1)
         lastSharePrice = 10.00 + ((startSupply - qty + 1) * 0.01);
     }
 
-    // Arithmetic Sum Formula: n/2 * (First + Last)
     const total = (qty / 2) * (firstSharePrice + lastSharePrice);
     const avgPrice = total / qty;
     const priceImpact = Math.abs(avgPrice - currentSpotPrice);
     
-    return { 
-        total, 
-        avgPrice, 
-        firstSharePrice, 
-        lastSharePrice,
-        priceImpact
-    };
+    return { total, avgPrice, priceImpact };
   };
 
   const numAmount = Number(amount);
   const { total: totalValue, avgPrice, priceImpact } = calculateTransaction(numAmount, mode);
 
-  // --- 2. MARKET SECURITY CHECK ---
+  // --- 2. REFRESH DATA & SECURITY CHECK ---
   useEffect(() => {
     if (isOpen) {
-      setAmount(''); // Reset input
+      setAmount('');
       setError(null);
+      // Refresh latest data from PROFILES (Fix: used to say 'users')
+      fetchLatestData();
       checkMarketStatus();
     }
   }, [isOpen, team]);
+
+  const fetchLatestData = async () => {
+      if(!userId) return;
+      // FIX: Query 'profiles' instead of 'users'
+      const { data: profile } = await supabase.from('profiles').select('usd_balance').eq('id', userId).single();
+      if(profile) setCurrentBalance(profile.usd_balance);
+
+      const { data: holding } = await supabase.from('holdings').select('shares_owned').eq('user_id', userId).eq('team_id', team.id).maybeSingle();
+      if(holding) setCurrentShares(holding.shares_owned);
+      else setCurrentShares(0);
+  };
 
   const checkMarketStatus = async () => {
     setMarketStatus('LOADING');
@@ -88,7 +93,6 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
         yesterday.setDate(yesterday.getDate() - 1);
         const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
         
-        // Check Yesterday AND Today to prevent the "Midnight Exploit"
         const datesParam = `${formatDate(yesterday)}-${formatDate(today)}`;
         const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/${sport}/scoreboard?dates=${datesParam}`;
 
@@ -131,7 +135,6 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
                     message = 'Game Finished (Payout Pending)';
                     break;
                 } else {
-                    // If yesterday's game finished, lock until 6 AM to be safe
                     if (currentHour < 6) {
                         isClosed = true;
                         message = 'Pending Overnight Payout';
@@ -150,19 +153,17 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
 
     } catch (e) {
         console.error("Market Check Error", e);
-        setMarketStatus('OPEN'); // Default open if API fails
+        setMarketStatus('OPEN');
     }
   };
 
   // --- 3. HANDLERS ---
   const handleSetMax = () => {
       if (mode === 'SELL') {
-          setAmount(userShares);
+          setAmount(currentShares);
       } else {
-          // Estimate max buy (Account for bonding curve slippage)
-          // Naive estimate: Balance / Spot. 
-          // We reduce it slightly (95%) to ensure the curve doesn't push them over balance.
-          const approx = Math.floor((userBalance * 0.99) / currentSpotPrice);
+          // 99% buffer for price slippage
+          const approx = Math.floor((currentBalance * 0.99) / currentSpotPrice);
           setAmount(approx > 0 ? approx : 0);
       }
   };
@@ -175,7 +176,7 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
     try {
       if (mode === 'BUY') {
         if (marketStatus === 'CLOSED') throw new Error("Market is closed.");
-        if (totalValue > userBalance) throw new Error(`Insufficient funds. Need $${totalValue.toFixed(2)}`);
+        if (totalValue > currentBalance) throw new Error(`Insufficient funds. Need $${totalValue.toFixed(2)}`);
         
         const { error } = await supabase.rpc('buy_shares', {
           p_user_id: userId,
@@ -186,7 +187,7 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
         if (error) throw error;
 
       } else {
-        if (numAmount > userShares) throw new Error(`Insufficient shares. You have ${userShares}.`);
+        if (numAmount > currentShares) throw new Error(`Insufficient shares. You have ${currentShares}.`);
 
         const { error } = await supabase.rpc('sell_shares', {
           p_user_id: userId,
@@ -207,9 +208,9 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
 
   if (!isOpen) return null;
 
-  // UI Validations
-  const isInsufficientFunds = mode === 'BUY' && totalValue > userBalance;
-  const isInsufficientShares = mode === 'SELL' && numAmount > userShares;
+  // Validation
+  const isInsufficientFunds = mode === 'BUY' && totalValue > currentBalance;
+  const isInsufficientShares = mode === 'SELL' && numAmount > currentShares;
   const isInvalid = isInsufficientFunds || isInsufficientShares;
 
   return (
@@ -288,15 +289,14 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
                 <span>Quantity (Shares)</span>
                 <span className={`${isInvalid ? 'text-red-400 font-bold' : ''}`}>
                     {mode === 'BUY' 
-                        ? `Available: $${userBalance.toFixed(2)}`
-                        : `Owned: ${userShares} Shares`
+                        ? `Available: $${currentBalance.toFixed(2)}`
+                        : `Owned: ${currentShares} Shares`
                     }
                 </span>
              </div>
 
              <div className="flex gap-2">
                 <div className="relative flex-1">
-                    {/* FIXED ICON: Hash instead of Dollar Sign */}
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
                         <Hash size={18} />
                     </div>
@@ -312,7 +312,6 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
                         disabled={marketStatus === 'CLOSED' && mode === 'BUY'}
                     />
                 </div>
-                {/* MAX BUTTON RESTORED */}
                 <button 
                     onClick={handleSetMax}
                     disabled={marketStatus === 'CLOSED' && mode === 'BUY'}
@@ -323,7 +322,7 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
              </div>
           </div>
 
-          {/* TOTAL & BREAKDOWN */}
+          {/* TOTAL */}
           <div className="bg-gray-800/50 rounded-xl p-4 space-y-2 border border-gray-700/50 relative">
              <div className="flex justify-between text-sm">
                 <div className="flex items-center gap-1 text-gray-400">
@@ -347,7 +346,7 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
              </div>
           </div>
 
-          {/* ERROR / VALIDATION MESSAGE */}
+          {/* ERROR */}
           {(error || isInvalid) && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg flex items-center gap-2 animate-in slide-in-from-top-1">
                 <AlertCircle size={16} />
