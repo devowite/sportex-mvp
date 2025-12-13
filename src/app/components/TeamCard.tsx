@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ChevronDown, ChevronUp, HelpCircle, TrendingUp, TrendingDown, CalendarClock, History, CalendarDays, Radio } from 'lucide-react';
+import { ChevronDown, ChevronUp, HelpCircle, TrendingUp, TrendingDown, CalendarClock, History, CalendarDays } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface TeamCardProps {
@@ -19,17 +19,15 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
   const [changePercent, setChangePercent] = useState(0);
   const [avgCost, setAvgCost] = useState(0);
   
-  // --- LAST 5 STATE ---
+  // --- STATE ---
   const [showLast5, setShowLast5] = useState(false);
   const [last5Games, setLast5Games] = useState<any[]>([]);
   const [loadingLast5, setLoadingLast5] = useState(false);
 
-  // --- NEXT 5 STATE ---
   const [showNext5, setShowNext5] = useState(false);
   const [next5Games, setNext5Games] = useState<any[]>([]);
   const [loadingNext5, setLoadingNext5] = useState(false);
 
-  // --- LIVE GAME STATE ---
   const [liveGameInfo, setLiveGameInfo] = useState<{score: string, time: string} | null>(null);
 
   // --- MATH ---
@@ -48,7 +46,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
       logoUrl = `https://assets.nhle.com/logos/nhl/svg/${team.ticker}_light.svg`;
   }
 
-  // --- DATE HELPERS ---
+  // --- DATE CHECK ---
   const gameDate = team.next_game_at ? new Date(team.next_game_at) : null;
   const isGameToday = gameDate && 
       gameDate.getDate() === new Date().getDate() && 
@@ -62,20 +60,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
     return `${dayName} ${timeStr}`;
   };
 
-  // --- API HELPER ---
-  const getEspnEndpoint = () => {
-      let sport = 'football/nfl';
-      if (team.league === 'NHL') sport = 'hockey/nhl';
-      
-      let searchTicker = team.ticker;
-      if (team.league === 'NFL') {
-          if(searchTicker === 'WSH') searchTicker = 'WAS';
-          if(searchTicker === 'JAX') searchTicker = 'JAC';
-      }
-      return `https://site.api.espn.com/apis/site/v2/sports/${sport}/teams/${searchTicker}/schedule`;
-  };
-
-  // --- TICKER TRANSLATOR ---
+  // --- TRANSLATOR ---
   const translateTicker = (espnTicker: string, league: string) => {
       if (league === 'NHL') {
           if (espnTicker === 'TB') return 'TBL';
@@ -93,33 +78,44 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
       return espnTicker; 
   };
 
-  // --- FETCH LIVE SCORE (Only if game is today) ---
+  // --- FETCH LIVE SCORE (Use Scoreboard API for Real-Time) ---
   useEffect(() => {
-    if (!isGameToday) return; // Don't waste API calls if no game
+    if (!isGameToday) return; 
 
     const fetchLiveScore = async () => {
         try {
-            const res = await fetch(getEspnEndpoint());
+            // FIX: Use global Scoreboard endpoint instead of Team Schedule
+            let sport = 'football/nfl';
+            if (team.league === 'NHL') sport = 'hockey/nhl';
+            const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/${sport}/scoreboard`;
+
+            const res = await fetch(scoreboardUrl);
             const data = await res.json();
             const events = data.events || [];
             
-            // Find the game happening today/now
-            // ESPN Status: 'in' = In Progress
-            const liveGame = events.find((e: any) => e.competitions[0].status.type.state === 'in');
+            // Find game where this team is playing AND it's live ('in')
+            const liveGame = events.find((e: any) => {
+                const isLive = e.status.type.state === 'in';
+                const hasTeam = e.competitions[0].competitors.some((c: any) => {
+                    const t = c.team.abbreviation;
+                    // Match against standard ticker OR translated ones
+                    return t === team.ticker || translateTicker(t, team.league) === team.ticker;
+                });
+                return isLive && hasTeam;
+            });
 
             if (liveGame) {
                 const comp = liveGame.competitions[0];
-                const myTeam = comp.competitors.find((c: any) => 
-                    c.team.abbreviation === team.ticker || 
-                    (team.league === 'NFL' && team.ticker === 'WSH' && c.team.abbreviation === 'WAS') ||
-                    (team.league === 'NFL' && team.ticker === 'JAX' && c.team.abbreviation === 'JAC')
-                );
-                const oppTeam = comp.competitors.find((c: any) => c.id !== myTeam?.id);
+                const myTeamData = comp.competitors.find((c: any) => {
+                    const t = c.team.abbreviation;
+                    return t === team.ticker || translateTicker(t, team.league) === team.ticker;
+                });
+                const oppTeamData = comp.competitors.find((c: any) => c.id !== myTeamData?.id);
 
-                if (myTeam && oppTeam) {
+                if (myTeamData && oppTeamData) {
                     setLiveGameInfo({
-                        score: `${myTeam.team.abbreviation} ${myTeam.score.value}-${oppTeam.score.value} ${oppTeam.team.abbreviation}`,
-                        time: comp.status.type.shortDetail // e.g. "2nd - 14:00"
+                        score: `${myTeamData.team.abbreviation} ${myTeamData.score}-${oppTeamData.score} ${oppTeamData.team.abbreviation}`,
+                        time: comp.status.type.shortDetail // e.g. "3rd - 2:00"
                     });
                 }
             }
@@ -129,21 +125,32 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
     };
 
     fetchLiveScore();
-    // Optional: Set an interval to refresh every minute if you want truly live updates
-    // const interval = setInterval(fetchLiveScore, 60000);
-    // return () => clearInterval(interval);
+    // Poll every 60s for updates if desired
+    const interval = setInterval(fetchLiveScore, 60000);
+    return () => clearInterval(interval);
 
-  }, [isGameToday, team.ticker]);
+  }, [isGameToday, team.ticker, team.league]);
 
 
-  // --- FETCH LAST 5 ---
+  // --- FETCH LAST 5 (Uses Team Schedule) ---
   const handleLast5Hover = async () => {
     setShowLast5(true);
     if (last5Games.length > 0 || loadingLast5) return; 
 
     setLoadingLast5(true);
     try {
-        const res = await fetch(getEspnEndpoint());
+        let sport = 'football/nfl';
+        if (team.league === 'NHL') sport = 'hockey/nhl';
+        let searchTicker = team.ticker;
+        // Inverse map for API lookup
+        if (team.league === 'NFL') {
+            if(searchTicker === 'WSH') searchTicker = 'WAS';
+            if(searchTicker === 'JAX') searchTicker = 'JAC';
+        }
+        // NHL doesn't usually need inverse map for the URL, ESPN handles standard tickers mostly okay in URL
+        // except for maybe UTA/UTAH
+
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/teams/${searchTicker}/schedule`);
         const data = await res.json();
         const events = data.events || [];
         
@@ -155,8 +162,8 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
         const results = [];
         for (const e of completed) {
             const game = e.competitions[0];
-            const myTeam = game.competitors.find((c: any) => c.team.abbreviation === team.ticker || c.team.id === team.id);
-            const oppTeam = game.competitors.find((c: any) => c.team.abbreviation !== myTeam?.team?.abbreviation);
+            const myTeam = game.competitors.find((c: any) => c.team.abbreviation === team.ticker || translateTicker(c.team.abbreviation, team.league) === team.ticker || c.team.id === team.id);
+            const oppTeam = game.competitors.find((c: any) => c.id !== myTeam?.id);
             
             if (myTeam && oppTeam) {
                 const isWin = myTeam.winner === true;
@@ -181,7 +188,15 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
 
     setLoadingNext5(true);
     try {
-        const res = await fetch(getEspnEndpoint());
+        let sport = 'football/nfl';
+        if (team.league === 'NHL') sport = 'hockey/nhl';
+        let searchTicker = team.ticker;
+        if (team.league === 'NFL') {
+            if(searchTicker === 'WSH') searchTicker = 'WAS';
+            if(searchTicker === 'JAX') searchTicker = 'JAC';
+        }
+
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/teams/${searchTicker}/schedule`);
         const data = await res.json();
         const events = data.events || [];
         
@@ -194,8 +209,8 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
 
         for (const e of upcoming) {
             const game = e.competitions[0];
-            const myTeamTicker = team.ticker === 'WSH' ? 'WAS' : team.ticker; 
-            const oppTeam = game.competitors.find((c: any) => c.team.abbreviation !== myTeamTicker && c.team.id !== team.id);
+            const myTeam = game.competitors.find((c: any) => c.team.abbreviation === team.ticker || translateTicker(c.team.abbreviation, team.league) === team.ticker || c.team.id === team.id);
+            const oppTeam = game.competitors.find((c: any) => c.id !== myTeam?.id);
             
             if (oppTeam) {
                 const rawTicker = oppTeam.team.abbreviation;
