@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { X, DollarSign, AlertCircle, Lock } from 'lucide-react';
+import { X, AlertCircle, Lock, Calculator, Info } from 'lucide-react';
 
 interface TradeModalProps {
   team: any;
@@ -17,17 +17,61 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
   const [amount, setAmount] = useState<number>(0); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // User State
   const [userBalance, setUserBalance] = useState(0);
   const [userShares, setUserShares] = useState(0);
 
-  // --- MARKET SECURITY STATE ---
+  // Market Security State
   const [marketStatus, setMarketStatus] = useState<'OPEN' | 'CLOSED' | 'LOADING'>('LOADING');
   const [marketMessage, setMarketMessage] = useState('');
 
-  // 1. Calculate Price 
-  const currentPrice = 10.00 + (team.shares_outstanding * 0.01);
+  // --- 1. BONDING CURVE MATH ---
+  // Price P(S) = 10 + 0.01 * S
+  // To buy 'k' shares starting at supply 'S', we sum the price of share S+1 to S+k.
+  // Formula: k/2 * (Price_Start + Price_End)
+  
+  const currentSpotPrice = 10.00 + (team.shares_outstanding * 0.01);
 
-  // 2. Fetch Data (On Open)
+  const calculateTransaction = (qty: number, tradeMode: 'BUY' | 'SELL') => {
+    if (!qty || qty <= 0) return { total: 0, avgPrice: 0, endPrice: currentSpotPrice };
+
+    let startSupply = team.shares_outstanding;
+    let endSupply = tradeMode === 'BUY' ? startSupply + qty : startSupply - qty;
+    
+    // Safety for selling more than exists (though validation prevents this)
+    if (endSupply < 0) endSupply = 0;
+
+    let firstSharePrice = 0;
+    let lastSharePrice = 0;
+
+    if (tradeMode === 'BUY') {
+        // Price of next share (S+1)
+        firstSharePrice = 10.00 + ((startSupply + 1) * 0.01);
+        // Price of last share (S+k)
+        lastSharePrice = 10.00 + (endSupply * 0.01);
+    } else {
+        // Selling: Price of current share (S)
+        firstSharePrice = 10.00 + (startSupply * 0.01);
+        // Price of last share sold (S-k+1)
+        lastSharePrice = 10.00 + ((startSupply - qty + 1) * 0.01);
+    }
+
+    // Arithmetic Sum
+    const total = (qty / 2) * (firstSharePrice + lastSharePrice);
+    const avgPrice = total / qty;
+    
+    return { 
+        total, 
+        avgPrice, 
+        firstSharePrice, 
+        lastSharePrice 
+    };
+  };
+
+  const { total: totalValue, avgPrice } = calculateTransaction(amount, mode);
+
+  // --- 2. FETCH DATA ---
   useEffect(() => {
     if (isOpen && userId) {
       setAmount(0);
@@ -38,6 +82,7 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
   }, [isOpen, userId, team]);
 
   const fetchUserData = async () => {
+    if (!userId) return;
     const { data: userData } = await supabase.from('users').select('usd_balance').eq('id', userId).single();
     if (userData) setUserBalance(userData.usd_balance);
 
@@ -46,28 +91,35 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
     else setUserShares(0);
   };
 
-  // --- SECURITY CHECK: PREVENT EXPLOIT ---
+  const handleSetMax = () => {
+      if (mode === 'SELL') {
+          setAmount(userShares);
+      } else {
+          // Estimate max buy (Rough approximation due to curve)
+          // Simple heuristic: Balance / Current Price (It will be slightly less due to slippage, but close enough for UX start)
+          const approx = Math.floor(userBalance / currentSpotPrice);
+          setAmount(approx > 0 ? approx : 0);
+      }
+  };
+
+  // --- 3. MARKET SECURITY ---
   const checkMarketStatus = async () => {
     setMarketStatus('LOADING');
     try {
         let sport = 'football/nfl';
         if (team.league === 'NHL') sport = 'hockey/nhl';
 
-        // 1. Calculate Dates: Get Yesterday and Today in YYYYMMDD format
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-
         const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
-        const datesParam = `${formatDate(yesterday)}-${formatDate(today)}`; // Range: "20231212-20231213"
+        const datesParam = `${formatDate(yesterday)}-${formatDate(today)}`;
 
         const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/${sport}/scoreboard?dates=${datesParam}`;
-
         const res = await fetch(scoreboardUrl);
         const data = await res.json();
         const events = data.events || [];
 
-        // 2. Find ANY games involving this team (Yesterday OR Today)
         const relevantGames = events.filter((e: any) => {
             return e.competitions[0].competitors.some((c: any) => {
                 const t = c.team.abbreviation;
@@ -83,14 +135,13 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
             });
         });
 
-        // 3. Analyze Status
         let isClosed = false;
         let message = '';
-        const currentHour = new Date().getHours(); // 0-23
+        const currentHour = new Date().getHours(); 
 
         for (const game of relevantGames) {
-            const state = game.status.type.state; // 'pre', 'in', 'post'
-            const gameDateStr = game.date; // ISO string
+            const state = game.status.type.state; 
+            const gameDateStr = game.date; 
             const gameDate = new Date(gameDateStr);
             const isGameToday = gameDate.getDate() === today.getDate();
 
@@ -99,18 +150,12 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
                 message = 'Market Closed: Game in Progress';
                 break;
             }
-            
             if (state === 'post') {
-                // Game Finished. 
-                // IF it was Today: Close it.
-                // IF it was Yesterday: Close it ONLY if it's early morning (before 6 AM)
                 if (isGameToday) {
                     isClosed = true;
                     message = 'Market Closed: Game Finished (Payout Pending)';
                     break;
                 } else {
-                    // It was yesterday. Is it safe yet?
-                    // We assume Cron runs at 4 AM. We give a buffer until 6 AM.
                     if (currentHour < 6) {
                         isClosed = true;
                         message = 'Market Closed: Pending Overnight Payout';
@@ -133,39 +178,27 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
     }
   };
 
-  const calculateTotal = () => {
-    if (!amount) return 0;
-    return amount * currentPrice; 
-  };
-
+  // --- 4. EXECUTE ---
   const handleExecute = async () => {
     if (!userId || amount <= 0) return;
     setLoading(true);
     setError(null);
 
     try {
-      const totalCost = calculateTotal();
-
       if (mode === 'BUY') {
-        if (marketStatus === 'CLOSED') {
-            throw new Error("Market is closed for this team.");
-        }
-        if (totalCost > userBalance) {
-          throw new Error(`Insufficient funds. You need $${totalCost.toFixed(2)}`);
-        }
+        if (marketStatus === 'CLOSED') throw new Error("Market is closed.");
+        if (totalValue > userBalance) throw new Error(`Insufficient funds. Need $${totalValue.toFixed(2)}`);
         
         const { error } = await supabase.rpc('buy_shares', {
           p_user_id: userId,
           p_team_id: team.id,
           p_amount: amount,
-          p_price: currentPrice
+          p_price: avgPrice // We record the AVG price paid
         });
         if (error) throw error;
 
       } else {
-        if (amount > userShares) {
-          throw new Error(`You only have ${userShares} shares.`);
-        }
+        if (amount > userShares) throw new Error(`Insufficient shares. You have ${userShares}.`);
 
         const { error } = await supabase.rpc('sell_shares', {
           p_user_id: userId,
@@ -186,6 +219,11 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
 
   if (!isOpen) return null;
 
+  // Validation Check for UI
+  const isInsufficientFunds = mode === 'BUY' && totalValue > userBalance;
+  const isInsufficientShares = mode === 'SELL' && amount > userShares;
+  const isInvalid = isInsufficientFunds || isInsufficientShares;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-gray-900 border border-gray-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
@@ -198,7 +236,7 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
             </h2>
             <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs font-mono text-gray-400">
-                    Current Price: <span className="text-white font-bold">${currentPrice.toFixed(2)}</span>
+                    Spot Price: <span className="text-white font-bold">${currentSpotPrice.toFixed(2)}</span>
                 </span>
                 
                 {marketStatus === 'CLOSED' ? (
@@ -219,13 +257,12 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
           </button>
         </div>
 
-        {/* MARKET CLOSED WARNING */}
+        {/* WARNINGS */}
         {marketStatus === 'CLOSED' && mode === 'BUY' && (
             <div className="bg-red-500/10 border-b border-red-500/20 p-3 flex items-start gap-3">
                 <AlertCircle className="text-red-400 shrink-0" size={18} />
                 <p className="text-xs text-red-200 leading-relaxed">
-                    <strong>Trading Suspended:</strong> {marketMessage}. <br/>
-                    Buying is disabled until the daily payout process completes (approx 6 AM ET).
+                    <strong>Trading Suspended:</strong> {marketMessage}.
                 </p>
             </div>
         )}
@@ -233,9 +270,10 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
         {/* BODY */}
         <div className="p-6 space-y-6">
           
+          {/* TABS */}
           <div className="grid grid-cols-2 gap-2 bg-gray-800 p-1 rounded-lg">
             <button 
-              onClick={() => setMode('BUY')}
+              onClick={() => { setMode('BUY'); setAmount(0); }}
               disabled={marketStatus === 'CLOSED'} 
               className={`py-2 text-sm font-bold rounded-md transition-all ${
                 mode === 'BUY' 
@@ -246,7 +284,7 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
               Buy
             </button>
             <button 
-              onClick={() => setMode('SELL')}
+              onClick={() => { setMode('SELL'); setAmount(0); }}
               className={`py-2 text-sm font-bold rounded-md transition-all ${
                 mode === 'SELL' 
                   ? 'bg-red-600 text-white shadow-lg' 
@@ -257,77 +295,97 @@ export default function TradeModal({ team, isOpen, onClose, userId, onSuccess }:
             </button>
           </div>
 
+          {/* INPUT */}
           <div className="space-y-4">
              <div className="flex justify-between text-xs text-gray-400 px-1">
-                <span>{mode === 'BUY' ? 'Buying' : 'Selling'} Amount</span>
-                <span>
+                <span>Shares to {mode === 'BUY' ? 'Buy' : 'Sell'}</span>
+                <span className={`${isInvalid ? 'text-red-400 font-bold' : ''}`}>
                     {mode === 'BUY' 
                         ? `Balance: $${userBalance.toFixed(2)}`
-                        : `Owned: ${userShares} Shares`
+                        : `Owned: ${userShares}`
                     }
                 </span>
              </div>
 
-             <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                <input 
-                  type="number" 
-                  min="1"
-                  value={amount || ''}
-                  onChange={(e) => setAmount(Math.floor(Number(e.target.value)))}
-                  className="w-full bg-gray-950 border border-gray-700 rounded-xl py-4 pl-10 pr-4 text-white text-lg font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent transition outline-none"
-                  placeholder="0"
-                  disabled={marketStatus === 'CLOSED' && mode === 'BUY'}
-                />
-             </div>
-             
              <div className="flex gap-2">
-                {[1, 5, 10, 25, 50].map((num) => (
-                    <button 
-                        key={num}
-                        onClick={() => setAmount(num)}
-                        disabled={marketStatus === 'CLOSED' && mode === 'BUY'}
-                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs py-1.5 rounded border border-gray-700 transition"
-                    >
-                        {num}
-                    </button>
-                ))}
+                <div className="relative flex-1">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+                        <Calculator size={18} />
+                    </div>
+                    <input 
+                    type="number" 
+                    min="1"
+                    value={amount || ''}
+                    onChange={(e) => setAmount(Math.floor(Number(e.target.value)))}
+                    className={`w-full bg-gray-950 border rounded-xl py-4 pl-10 pr-4 text-white text-lg font-mono focus:ring-2 transition outline-none ${
+                        isInvalid ? 'border-red-500 focus:ring-red-500' : 'border-gray-700 focus:ring-blue-500'
+                    }`}
+                    placeholder="0"
+                    disabled={marketStatus === 'CLOSED' && mode === 'BUY'}
+                    />
+                </div>
+                <button 
+                    onClick={handleSetMax}
+                    disabled={marketStatus === 'CLOSED' && mode === 'BUY'}
+                    className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-blue-400 font-bold px-4 rounded-xl text-xs transition"
+                >
+                    MAX
+                </button>
              </div>
           </div>
 
-          <div className="bg-gray-800/50 rounded-xl p-4 space-y-2 border border-gray-700/50">
+          {/* TOTAL / BREAKDOWN */}
+          <div className="bg-gray-800/50 rounded-xl p-4 space-y-2 border border-gray-700/50 relative group">
+             {/* TOOLTIP (Appears on Hover) */}
+             <div className="absolute bottom-full left-0 w-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                 <div className="bg-black border border-gray-600 text-gray-300 text-xs p-2 rounded shadow-xl">
+                    <p className="font-bold text-white mb-1">Bonding Curve Mechanics</p>
+                    <p>Current Spot: ${currentSpotPrice.toFixed(2)}</p>
+                    <p>Avg Price for {amount || 0} shares: ${avgPrice.toFixed(2)}</p>
+                    <p className="italic text-gray-500 mt-1">
+                        {mode === 'BUY' ? 'Buying pushes price up.' : 'Selling pushes price down.'}
+                    </p>
+                 </div>
+             </div>
+
              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Price per share</span>
-                <span className="text-white font-mono">${currentPrice.toFixed(2)}</span>
+                <div className="flex items-center gap-1 text-gray-400 cursor-help">
+                    <Info size={12}/>
+                    <span>Avg Price per Share</span>
+                </div>
+                <span className="text-gray-300 font-mono">${avgPrice.toFixed(2)}</span>
              </div>
              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Total {mode === 'BUY' ? 'Cost' : 'Value'}</span>
+                <span className="text-gray-400 font-bold uppercase">Total {mode === 'BUY' ? 'Cost' : 'Value'}</span>
                 <span className={`font-mono font-bold text-lg ${mode === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
-                    ${calculateTotal().toFixed(2)}
+                    ${totalValue.toFixed(2)}
                 </span>
              </div>
           </div>
 
-          {error && (
+          {/* ERROR MESSAGE */}
+          {(error || isInvalid) && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg flex items-center gap-2 animate-in slide-in-from-top-1">
                 <AlertCircle size={16} />
-                {error}
+                {error ? error : (isInsufficientFunds ? 'Insufficient Funds' : 'Insufficient Shares')}
             </div>
           )}
 
+          {/* CONFIRM BUTTON */}
           <button
             onClick={handleExecute}
-            disabled={loading || amount <= 0 || (marketStatus === 'CLOSED' && mode === 'BUY')}
+            disabled={loading || amount <= 0 || (marketStatus === 'CLOSED' && mode === 'BUY') || isInvalid}
             className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg active:scale-[0.98] ${
                 loading ? 'bg-gray-700 text-gray-500 cursor-wait' :
                 (marketStatus === 'CLOSED' && mode === 'BUY') ? 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50' :
+                isInvalid ? 'bg-gray-800 text-gray-500 cursor-not-allowed' :
                 mode === 'BUY' ? 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20' :
                 'bg-red-600 hover:bg-red-500 text-white shadow-red-900/20'
             }`}
           >
             {loading ? 'Processing...' : (
                 marketStatus === 'CLOSED' && mode === 'BUY' ? 'MARKET CLOSED' :
-                `Confirm ${mode} ($${calculateTotal().toFixed(2)})`
+                `Confirm ${mode}`
             )}
           </button>
 
