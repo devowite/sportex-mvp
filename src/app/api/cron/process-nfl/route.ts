@@ -5,69 +5,64 @@ const ESPN_NFL_STANDINGS = 'https://site.api.espn.com/apis/site/v2/sports/footba
 export const dynamic = 'force-dynamic'; 
 
 export async function GET(request: Request) {
-  const log: string[] = [];
-  
   try {
+    console.log("--- STARTING DIAGNOSTIC ---");
+    
     const res = await fetch(ESPN_NFL_STANDINGS);
     const data = await res.json();
     
-    // X-RAY DIAGNOSTICS
-    // We walk down the tree and log what keys exist at each step.
-    
-    // 1. Root Level
-    log.push(`Root Keys: ${Object.keys(data).join(', ')}`);
+    // 1. Root
+    console.log(`Root Keys: ${Object.keys(data).join(', ')}`);
     
     const conferences = data.children || [];
     if (conferences.length === 0) {
-        log.push("CRITICAL: 'children' array (conferences) is empty.");
-        return NextResponse.json({ success: false, logs: log });
+        console.log("CRITICAL: 'children' (conferences) is empty.");
+        return NextResponse.json({ success: false });
     }
 
-    // 2. Conference Level (e.g., AFC)
-    const firstConf = conferences[0];
-    log.push(`Conf[0] Name: ${firstConf.name}`);
-    log.push(`Conf[0] Keys: ${Object.keys(firstConf).join(', ')}`);
-
-    const divisions = firstConf.children || [];
-    if (divisions.length === 0) {
-        log.push("CRITICAL: 'children' array (divisions) is empty.");
-        return NextResponse.json({ success: false, logs: log });
+    // 2. Division
+    // Digging deeper...
+    const firstDiv = conferences[0]?.children?.[0];
+    if (!firstDiv) {
+        console.log("CRITICAL: Division not found.");
+        return NextResponse.json({ success: false });
     }
+    console.log(`Division: ${firstDiv.name}`);
 
-    // 3. Division Level (e.g., AFC East)
-    const firstDiv = divisions[0];
-    log.push(`Div[0] Name: ${firstDiv.name}`);
-    log.push(`Div[0] Keys: ${Object.keys(firstDiv).join(', ')}`);
-    
-    // CHECKPOINT: Does 'standings' exist here?
+    // 3. Entries (Teams)
+    // Check if 'standings' exists or if it's direct
     if (!firstDiv.standings) {
-        log.push("CRITICAL: 'standings' object is MISSING on Division object.");
-        // Sometimes it's directly in 'children' for simpler structures?
+         console.log("CRITICAL: 'standings' object is MISSING on Division.");
+         console.log(`Division Keys: ${Object.keys(firstDiv).join(', ')}`);
     } else {
         const entries = firstDiv.standings.entries || [];
-        log.push(`Entries Count: ${entries.length}`);
+        console.log(`Entries (Teams) Count: ${entries.length}`);
         
         if (entries.length > 0) {
-            // 4. Team Entry Level
             const firstTeam = entries[0];
-            log.push(`Team[0] Keys: ${Object.keys(firstTeam).join(', ')}`);
+            console.log(`Team: ${firstTeam.team.displayName} (${firstTeam.team.abbreviation})`);
             
-            // CHECKPOINT: Does 'stats' exist?
-            if (firstTeam.stats) {
-                log.push(`Stats Array Length: ${firstTeam.stats.length}`);
-                if (firstTeam.stats.length > 0) {
-                    log.push(`Stat[0] Keys: ${Object.keys(firstTeam.stats[0]).join(', ')}`);
-                    log.push(`Stat[0] Sample: ${JSON.stringify(firstTeam.stats[0])}`);
-                }
+            // 4. STATS CHECK
+            if (!firstTeam.stats) {
+                console.log("CRITICAL: 'stats' array is MISSING.");
+                console.log(`Team Keys: ${Object.keys(firstTeam).join(', ')}`);
             } else {
-                log.push("CRITICAL: 'stats' array is MISSING on Team Entry.");
+                console.log(`Stats Array Length: ${firstTeam.stats.length}`);
+                // PRINT THE ACTUAL STATS
+                if (firstTeam.stats.length > 0) {
+                    // Print the first 3 stats so we can see the format
+                    const sample = firstTeam.stats.slice(0, 3);
+                    console.log("SAMPLE STATS DATA:", JSON.stringify(sample, null, 2));
+                }
             }
         }
     }
 
-    return NextResponse.json({ success: true, logs: log });
+    console.log("--- DIAGNOSTIC COMPLETE ---");
+    return NextResponse.json({ success: true });
 
   } catch (error: any) {
+    console.error("ERROR:", error.message);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
