@@ -121,7 +121,7 @@ export default function Home() {
         .from('transactions')
         .select('shares_amount, usd_amount')
         .gte('created_at', yesterday.toISOString())
-        .in('team_id', teamIds); 
+        .in('team_id', teamIds)
 		.in('type', ['BUY', 'SELL']);
     
     let volShares = 0;
