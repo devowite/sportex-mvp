@@ -17,7 +17,6 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   // 1. Setup Admin Client (Bypasses RLS Security)
   // We use the Service Key if available, otherwise we try the Anon key 
-  // (Assuming you disabled RLS or set up the key correctly)
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -26,7 +25,7 @@ export async function GET(request: Request) {
   const log: string[] = [];
 
   try {
-    constQl res = await fetch(ESPN_SCOREBOARD);
+    const res = await fetch(ESPN_SCOREBOARD);
     const data = await res.json();
     const games = data.events || [];
 
