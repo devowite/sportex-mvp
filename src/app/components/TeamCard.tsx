@@ -301,24 +301,39 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
       setChangePercent(change);
 
       if (myShares > 0 && userId) {
-        const { data: myBuys } = await supabase
+        // Fetch ALL transactions (BUY and SELL) ordered by time
+        const { data: allTeamTxs } = await supabase
             .from('transactions')
-            .select('usd_amount, shares_amount')
+            .select('type, usd_amount, shares_amount')
             .eq('user_id', userId)
             .eq('team_id', team.id)
-            .eq('type', 'BUY');
+            .order('created_at', { ascending: true });
         
-        if (myBuys && myBuys.length > 0) {
-            let totalSpent = 0;
-            let totalBought = 0;
-            myBuys.forEach((t: any) => {
-                totalSpent += t.usd_amount;
-                totalBought += t.shares_amount;
+        if (allTeamTxs) {
+            let currentHoldings = 0;
+            let currentTotalCost = 0;
+
+            allTeamTxs.forEach((t: any) => {
+                if (t.type === 'BUY') {
+                    currentHoldings += t.shares_amount;
+                    currentTotalCost += t.usd_amount;
+                } else if (t.type === 'SELL') {
+                    // When selling, we reduce the Total Cost proportionally
+                    // This preserves the "Average Cost" of the remaining shares
+                    const avgCostAtSale = currentHoldings > 0 ? currentTotalCost / currentHoldings : 0;
+                    currentTotalCost -= (avgCostAtSale * t.shares_amount);
+                    currentHoldings -= t.shares_amount;
+                }
             });
-            if (totalBought > 0) {
-                setAvgCost(totalSpent / totalBought);
+
+            // Handle tiny floating point errors or zero
+            if (currentHoldings > 0) {
+                setAvgCost(currentTotalCost / currentHoldings);
+            } else {
+                setAvgCost(0);
             }
         }
+      }
       }
     };
     loadData();

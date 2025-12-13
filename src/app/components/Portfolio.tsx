@@ -74,20 +74,34 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
         const currentPrice = 10.00 + (team.shares_outstanding * 0.01);
         const marketValue = shares * currentPrice;
 
-        // 1. Calc Avg Cost (Buy History)
-        const teamBuys = allTxs.filter((t: any) => t.team_id === teamId && t.type === 'BUY');
-        let totalSpent = 0;
-        let totalBought = 0;
-        teamBuys.forEach((t: any) => {
-            totalSpent += t.usd_amount;
-            totalBought += t.shares_amount;
+        // 1. Calc Weighted Avg Cost (FIFO-style for Current Position)
+        // Filter transactions for this team and sort oldest -> newest
+        const teamTxs = allTxs
+            .filter((t: any) => t.team_id === teamId)
+            .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        let runningHoldings = 0;
+        let runningTotalCost = 0;
+
+        teamTxs.forEach((t: any) => {
+            if (t.type === 'BUY') {
+                runningHoldings += t.shares_amount;
+                runningTotalCost += t.usd_amount;
+            } else if (t.type === 'SELL') {
+                // Reduce cost basis proportionally to shares sold
+                const currentAvg = runningHoldings > 0 ? runningTotalCost / runningHoldings : 0;
+                runningTotalCost -= (currentAvg * t.shares_amount);
+                runningHoldings -= t.shares_amount;
+            }
         });
-        
-        const avgCost = totalBought > 0 ? totalSpent / totalBought : 10.00;
+
+        // If we have shares left, calc the final avg. If 0, fallback to default.
+        const avgCost = runningHoldings > 0 ? runningTotalCost / runningHoldings : 10.00;
+
+        // Recalculate totals using the new weighted avgCost
         const totalCost = avgCost * shares;
         const gainLoss = marketValue - totalCost;
         const gainLossPercent = totalCost > 0 ? ((marketValue - totalCost) / totalCost) * 100 : 0;
-
         // 2. Calc Total Dividends (LTD for this asset)
         // We sum up every transaction of type 'DIVIDEND' for this team
         const totalAssetDividends = allTxs
