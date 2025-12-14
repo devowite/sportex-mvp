@@ -65,7 +65,7 @@ export default function MarketStats({ marketCap, volume24hShares, volume24hDolla
 
       <StatCard 
         icon={BarChart3} 
-        label="Avg. Win/Share" 
+        label="Avg. Dividend" 
         value={`$${avgYield.toFixed(2)}`}
         color="text-green-400"
         tooltip="The weighted average payout per share across the entire market based on current supply."
@@ -73,7 +73,7 @@ export default function MarketStats({ marketCap, volume24hShares, volume24hDolla
 
       <StatCard 
         icon={Trophy} 
-        label="Total Dividend Bank" 
+        label="Total Dividend Pot" 
         value={`$${totalBank.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
         color="text-yellow-400"
         tooltip="Total cash currently sitting in all Team Banks, waiting to be paid out to winners."

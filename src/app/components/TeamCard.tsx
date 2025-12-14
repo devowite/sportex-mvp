@@ -590,7 +590,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
            </div>
 
            <div className="flex flex-col items-end">
-              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Payout/Win/Share</span>
+              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Dividend</span>
               <div className="flex items-center gap-1 text-green-400">
                 <span className="font-mono font-bold text-lg">${estPayoutPerShare.toFixed(2)}</span>
               </div>
