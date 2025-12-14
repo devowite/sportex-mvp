@@ -39,7 +39,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId, is
       isClosed: boolean;    // Market Closed Flag
   } | null>(null);
 
-// --- ADMIN: VIEW HOLDERS ---
+// --- ADMIN: VIEW HOLDERS (ROBUST VERSION) ---
 const [showHolders, setShowHolders] = useState(false);
 const [holders, setHolders] = useState<any[]>([]);
 const [loadingHolders, setLoadingHolders] = useState(false);
@@ -49,16 +49,50 @@ const handleViewHolders = async (e: React.MouseEvent) => {
   setShowHolders(true);
   setLoadingHolders(true);
   
-  // Fetch holdings + Profile data
-  const { data, error } = await supabase
+  // Step 1: Fetch holdings strictly (No joins yet)
+  const { data: rawHoldings, error: holdingsError } = await supabase
       .from('holdings')
-      // Removed ":user_id" to let Supabase find the default foreign key automatically
-        .select('shares_owned, profiles (email, username)')
+      .select('user_id, shares_owned')
       .eq('team_id', team.id)
-      .gt('shares_owned', 0)
-      .order('shares_owned', { ascending: false });
+      .gt('shares_owned', 0);
 
-  if (data) setHolders(data);
+  if (holdingsError) {
+      console.error("Admin Error (Holdings):", holdingsError);
+      alert("Error fetching holdings. Check console.");
+      setLoadingHolders(false);
+      return;
+  }
+
+  if (!rawHoldings || rawHoldings.length === 0) {
+      setHolders([]);
+      setLoadingHolders(false);
+      return;
+  }
+
+  // Step 2: Fetch Profiles for these specific users
+  const userIds = rawHoldings.map((h: any) => h.user_id);
+  const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email, username')
+      .in('id', userIds);
+
+  if (profilesError) {
+      console.error("Admin Error (Profiles):", profilesError);
+  }
+
+  // Step 3: Merge the data manually in Javascript
+  const mergedData = rawHoldings.map((h: any) => {
+      const profile = profiles?.find((p: any) => p.id === h.user_id);
+      return {
+          shares_owned: h.shares_owned,
+          profiles: profile || { email: 'Unknown', username: 'Unknown' } // Fallback
+      };
+  });
+
+  // Step 4: Sort by shares (Highest to Lowest)
+  mergedData.sort((a: any, b: any) => b.shares_owned - a.shares_owned);
+
+  setHolders(mergedData);
   setLoadingHolders(false);
 };
 
