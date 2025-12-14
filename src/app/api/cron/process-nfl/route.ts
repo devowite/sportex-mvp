@@ -69,21 +69,30 @@ export async function GET(request: Request) {
       // --- 1. LOCK SCHEDULE LOGIC ---
       // Goal: Keep results visible until the following Tuesday at 9 AM.
       
-      // Calculate "Reset Date" (Next Tuesday relative to the Game)
-      const dayOfWeek = gameDate.getDay(); // 0=Sun, 1=Mon... 4=Thu
+      const dayOfWeek = gameDate.getDay(); 
       let daysUntilTuesday = (2 - dayOfWeek + 7) % 7;
-      if (daysUntilTuesday === 0) daysUntilTuesday = 7; // If game is Tue, show until next Tue
+      if (daysUntilTuesday === 0) daysUntilTuesday = 7; 
 
       const resetDate = new Date(gameDate);
       resetDate.setDate(gameDate.getDate() + daysUntilTuesday);
-      resetDate.setHours(9, 0, 0, 0); // 9 AM Reset Time
+      resetDate.setHours(9, 0, 0, 0); 
 
-      // LOCK IF: Game is Live OR (Game is Final AND It is not yet Tuesday)
-      if (state === 'in' || (state === 'post' && now < resetDate)) {
+      // TIMEZONE FIX: Use an "Hours Difference" check instead of "Calendar Day"
+      // This calculates how many hours away the game is (negative = started already)
+      const hoursDiff = (gameDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      
+      // We consider it "Today's Game" if it started within the last 12 hours 
+      // OR starts in the next 18 hours. This catches 8pm games safely.
+      const isGameRelevant = hoursDiff > -12 && hoursDiff < 18;
+
+      // LOCK IF: 
+      // 1. Game is Live ('in')
+      // 2. Game is Final ('post') AND not yet reset time
+      // 3. Game is RELEVANT (Near Now) - Prevents overwriting with next week's game
+      if (state === 'in' || (state === 'post' && now < resetDate) || isGameRelevant) {
           scheduleUpdated.add(homeTicker);
           scheduleUpdated.add(awayTicker);
           
-          // Force DB to show THIS game (so TeamCard displays the result)
           await supabaseAdmin.from('teams').update({
              next_opponent: awayTicker,
              next_game_at: gameDate.toISOString()
