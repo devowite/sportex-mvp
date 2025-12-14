@@ -14,11 +14,11 @@ interface PortfolioProps {
 export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
   // Filters
   const [timeFilter, setTimeFilter] = useState<'1D' | '1M' | '1Y' | 'ALL'>('ALL');
-  
+   
   // Data State
   const [portfolioData, setPortfolioData] = useState<any[]>([]);
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
-  
+   
   // UI State
   const [visibleTxCount, setVisibleTxCount] = useState(10); 
 
@@ -75,7 +75,6 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
         const marketValue = shares * currentPrice;
 
         // 1. Calc Weighted Avg Cost (FIFO-style for Current Position)
-        // Filter transactions for this team and sort oldest -> newest
         const teamTxs = allTxs
             .filter((t: any) => t.team_id === teamId)
             .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -88,22 +87,26 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
                 runningHoldings += t.shares_amount;
                 runningTotalCost += t.usd_amount;
             } else if (t.type === 'SELL') {
-                // Reduce cost basis proportionally to shares sold
                 const currentAvg = runningHoldings > 0 ? runningTotalCost / runningHoldings : 0;
                 runningTotalCost -= (currentAvg * t.shares_amount);
                 runningHoldings -= t.shares_amount;
             }
         });
 
-        // If we have shares left, calc the final avg. If 0, fallback to default.
         const avgCost = runningHoldings > 0 ? runningTotalCost / runningHoldings : 10.00;
 
         // Recalculate totals using the new weighted avgCost
         const totalCost = avgCost * shares;
         const gainLoss = marketValue - totalCost;
         const gainLossPercent = totalCost > 0 ? ((marketValue - totalCost) / totalCost) * 100 : 0;
+        
+        // --- NEW: Calculate Total Gain ($) ---
+        // Formula: (Current Price - Avg Cost) * Shares Owned
+        // Note: This is essentially the same as 'gainLoss' calculated above, 
+        // but explicit for the UI column we are adding.
+        const totalGainRaw = gainLoss; 
+
         // 2. Calc Total Dividends (LTD for this asset)
-        // We sum up every transaction of type 'DIVIDEND' for this team
         const totalAssetDividends = allTxs
             .filter((t: any) => t.team_id === teamId && t.type === 'DIVIDEND')
             .reduce((sum: number, t: any) => sum + t.usd_amount, 0);
@@ -119,7 +122,8 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
           avgCost,
           gainLoss,
           gainLossPercent,
-          totalAssetDividends // Pass this to the row
+          totalGainRaw, // Passed to UI
+          totalAssetDividends
         };
       }).filter(Boolean);
 
@@ -144,7 +148,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
   // --- CHART DATA ---
   const chartData = [
     { name: 'Cash', value: user?.usd_balance || 0, color: '#10b981' }, 
-    { name: 'Stocks', value: stats.totalEquity, color: '#3b82f6' },   
+    { name: 'Stocks', value: stats.totalEquity, color: '#3b82f6' },    
   ];
   const totalNetWorth = (user?.usd_balance || 0) + stats.totalEquity;
 
@@ -244,9 +248,10 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
                                 <th className="px-6 py-4 text-right">Shares</th>
                                 <th className="px-6 py-4 text-right">Avg Cost</th>
                                 <th className="px-6 py-4 text-right">Price</th>
-                                {/* NEW COLUMN HEADER */}
                                 <th className="px-6 py-4 text-right text-yellow-500">Total Divs</th>
                                 <th className="px-6 py-4 text-right">Return</th>
+                                {/* NEW HEADER: Total Gain */}
+                                <th className="px-6 py-4 text-right">Total Gain</th>
                                 <th className="px-6 py-4 text-right">Value</th>
                             </tr>
                         </thead>
@@ -261,7 +266,6 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
                                     <td className="px-6 py-4 text-right font-mono text-gray-500">${row.avgCost.toFixed(2)}</td>
                                     <td className="px-6 py-4 text-right font-mono text-white">${row.currentPrice.toFixed(2)}</td>
                                     
-                                    {/* NEW COLUMN CELL */}
                                     <td className="px-6 py-4 text-right font-mono text-yellow-400 font-bold">
                                         ${row.totalAssetDividends.toFixed(2)}
                                     </td>
@@ -272,6 +276,12 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
                                             {Math.abs(row.gainLossPercent).toFixed(2)}%
                                         </div>
                                     </td>
+                                    
+                                    {/* NEW COLUMN: Total Gain */}
+                                    <td className={`px-6 py-4 text-right font-mono font-bold ${row.totalGainRaw >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {row.totalGainRaw >= 0 ? '+' : ''}${row.totalGainRaw.toFixed(2)}
+                                    </td>
+
                                     <td className="px-6 py-4 text-right font-mono font-bold text-white text-lg">${row.marketValue.toFixed(2)}</td>
                                 </tr>
                             ))}
