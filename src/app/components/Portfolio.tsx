@@ -329,7 +329,13 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
                                 </td>
                                 <td className="px-6 py-3 text-white">
                                     {team?.name || 'Unknown Team'}
-                                    {isWin && <span className="text-gray-500 text-xs ml-2"> (Payout for {tx.shares_amount} shares)</span>}
+                                    {isWin && (
+                                        <span className="text-gray-500 text-xs ml-2">
+                                            {tx.description 
+                                                ? `(${tx.description})` 
+                                                : `(Payout for ${tx.shares_amount} shares)`}
+                                        </span>
+                                    )}
                                     {!isWin && <span className="text-gray-500 text-xs ml-2"> ({tx.shares_amount} shares @ ${tx.share_price.toFixed(2)})</span>}
                                 </td>
                                 <td className={`px-6 py-3 text-right font-mono font-bold ${isWin || !isBuy ? 'text-green-400' : 'text-gray-300'}`}>

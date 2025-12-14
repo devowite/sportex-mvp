@@ -334,6 +334,7 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
         .from('transactions')
         .select('created_at, share_price')
         .eq('team_id', team.id)
+		.neq('type', 'DIVIDEND')
         .order('created_at', { ascending: true })
         .limit(50);
       

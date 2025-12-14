@@ -138,13 +138,35 @@ export async function GET(request: Request) {
             const winner = competition.competitors.find((c: any) => c.winner === true);
             if (winner) {
                 let winnerTicker = winner.team.abbreviation;
-                if (TICKER_MAP[winnerTicker]) winnerTicker = TICKER_MAP[winnerTicker];
+if (TICKER_MAP[winnerTicker]) winnerTicker = TICKER_MAP[winnerTicker];
 
-                const { data: teamData } = await supabaseAdmin.from('teams').select('id, name').eq('ticker', winnerTicker).eq('league', 'NFL').single();
-                if (teamData) {
-                    await supabaseAdmin.rpc('simulate_win', { p_team_id: teamData.id });
-                    log.push(`PAYOUT: ${teamData.name}`);
-                }
+// 1. Identify Loser for the Description
+const loser = competition.competitors.find((c: any) => c.id !== winner.id);
+let matchDetails = 'Win';
+
+if (loser) {
+    const wScore = winner.score; // e.g. "4"
+    const lScore = loser.score;  // e.g. "2"
+    const lTicker = loser.team.abbreviation;
+    const vs = winner.homeAway === 'home' ? 'vs' : '@';
+    matchDetails = `W ${wScore}-${lScore} ${vs} ${lTicker}`;
+}
+
+const { data: teamData } = await supabaseAdmin
+    .from('teams')
+    .select('id, name')
+    .eq('ticker', winnerTicker)
+    .eq('league', 'NHL') // NOTE: Change to 'NFL' for the NFL file
+    .single();
+
+if (teamData) {
+    // Pass the p_description parameter
+    await supabaseAdmin.rpc('simulate_win', { 
+        p_team_id: teamData.id,
+        p_description: matchDetails 
+    });
+    log.push(`PAYOUT: ${teamData.name} (${matchDetails})`);
+}
             }
             await supabaseAdmin.from('processed_games').insert({ game_id: gameId, league: 'NFL' });
         }
