@@ -244,20 +244,20 @@ export default function Home() {
         </button>
       </aside>
 
-      {/* MARKETS SUB-SIDEBAR */}
+      {/* MARKETS SUB-SIDEBAR (Collapsible) */}
       {activeTab === 'MARKETS' && (
-        <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-10">
-            <div className="p-6 border-b border-gray-800">
-                <h2 className="text-xl font-bold">Markets</h2>
-                <p className="text-sm text-gray-500">Select a league</p>
+        <aside className="w-20 hover:w-64 transition-all duration-300 ease-in-out bg-gray-900 border-r border-gray-800 flex flex-col z-10 group overflow-hidden">
+            <div className="p-6 border-b border-gray-800 whitespace-nowrap flex flex-col justify-center h-24">
+                <h2 className="text-xl font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">Markets</h2>
+                <p className="text-sm text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">Select a league</p>
             </div>
             <div className="p-4 space-y-2">
-                {['NHL', 'NFL', 'NBA', 'MLB'].map((league) => (
+                {['NHL', 'NFL'].map((league) => (
                     <button
                         key={league}
                         onClick={() => setSelectedLeague(league as any)}
                         disabled={!activeLeagues.includes(league)}
-                        className={`w-full text-left px-4 py-3 rounded-lg font-bold flex justify-between items-center transition ${
+                        className={`w-full h-12 rounded-lg font-bold flex items-center justify-center group-hover:justify-start group-hover:px-4 transition-all ${
                             selectedLeague === league 
                             ? 'bg-blue-600 text-white shadow-md' 
                             : activeLeagues.includes(league)
@@ -271,7 +271,7 @@ export default function Home() {
                                 <img 
                                     src="https://assets.nhle.com/logos/nhl/svg/NHL_light.svg" 
                                     alt="NHL" 
-                                    className="h-6 w-6 object-contain" 
+                                    className="h-6 w-6 object-contain flex-shrink-0" 
                                 />
                             )}
                             {/* NFL LOGO */}
@@ -279,13 +279,15 @@ export default function Home() {
                                 <img 
                                     src="https://upload.wikimedia.org/wikipedia/en/a/a2/National_Football_League_logo.svg" 
                                     alt="NFL" 
-                                    className="h-6 w-6 object-contain" 
+                                    className="h-6 w-6 object-contain flex-shrink-0" 
                                 />
                             )}
                             
-                            {league}
+                            {/* TEXT (Hidden when collapsed) */}
+                            <span className="opacity-0 w-0 group-hover:w-auto group-hover:opacity-100 overflow-hidden whitespace-nowrap transition-all duration-300">
+                                {league}
+                            </span>
                         </div>
-                        {!activeLeagues.includes(league) && <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-500">SOON</span>}
                     </button>
                 ))}
             </div>
@@ -372,7 +374,6 @@ export default function Home() {
                                             onTrade={setSelectedTeam}
                                             onSimWin={user?.is_admin ? handleSimulateWin : undefined}
                                             userId={user?.id}
-                                            isAdmin={user?.is_admin}
                                         />
                                     ))}
                                 </div>
@@ -390,7 +391,6 @@ export default function Home() {
                                         onTrade={setSelectedTeam}
                                         onSimWin={user?.is_admin ? handleSimulateWin : undefined}
                                         userId={user?.id}
-                                        isAdmin={user?.is_admin}
                                     />
                                 ))}
                             </div>
