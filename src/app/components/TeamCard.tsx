@@ -652,8 +652,8 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
                     <span className="font-mono text-gray-300">{team.shares_outstanding}</span>
                 </div>
                 <div className="flex justify-between">
-                    <span className="text-gray-400">Dividend Bank</span>
-                    <span className="font-mono text-yellow-500">${team.dividend_bank.toFixed(2)}</span>
+                    <span className="text-gray-400">Dividend Pot</span>
+                    <span className="font-mono text-yellow-500">${(team.dividend_bank * 0.50).toFixed(2)}</span>
                 </div>
                 
                 <div className="flex justify-between items-center relative z-10">
