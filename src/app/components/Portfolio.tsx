@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, Wallet, Filter, Trophy, History, ChevronDown, Layers } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { ArrowUpRight, ArrowDownRight, Wallet, Filter, Trophy, History, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 
 interface PortfolioProps {
   user: any;
@@ -21,6 +21,18 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
    
   // UI State
   const [visibleTxCount, setVisibleTxCount] = useState(10); 
+  
+  // --- COLLAPSIBLE STATE (Default Closed) ---
+  const [isAssetsExpanded, setIsAssetsExpanded] = useState(false);
+  const [expandedLeagues, setExpandedLeagues] = useState<Record<string, boolean>>({});
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+
+  const toggleLeague = (league: string) => {
+    setExpandedLeagues(prev => ({
+        ...prev,
+        [league]: !prev[league]
+    }));
+  };
 
   // Stats State
   const [stats, setStats] = useState({
@@ -100,10 +112,6 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
         const gainLoss = marketValue - totalCost;
         const gainLossPercent = totalCost > 0 ? ((marketValue - totalCost) / totalCost) * 100 : 0;
         
-        // --- NEW: Calculate Total Gain ($) ---
-        // Formula: (Current Price - Avg Cost) * Shares Owned
-        // Note: This is essentially the same as 'gainLoss' calculated above, 
-        // but explicit for the UI column we are adding.
         const totalGainRaw = gainLoss; 
 
         // 2. Calc Total Dividends (LTD for this asset)
@@ -122,7 +130,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
           avgCost,
           gainLoss,
           gainLossPercent,
-          totalGainRaw, // Passed to UI
+          totalGainRaw, 
           totalAssetDividends
         };
       }).filter(Boolean);
@@ -155,7 +163,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       
-      {/* 1. STATS CARDS */}
+      {/* 1. STATS CARDS (Always Visible) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Net Worth */}
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 relative overflow-hidden">
@@ -224,151 +232,183 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
         </div>
       </div>
 
-      {/* 2. CURRENT HOLDINGS (SPLIT BY MARKET) */}
-      <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Filter size={16} className="text-gray-500" />
-            <span className="text-sm font-bold text-gray-300">Current Assets</span>
-          </div>
-
-          {Object.keys(assetsByLeague).length > 0 ? Object.keys(assetsByLeague).map((league) => (
-              <div key={league} className="mb-6">
-                {/* MARKET HEADER */}
-                <div className="flex items-center gap-2 mb-2 px-1">
-                    <Layers size={14} className="text-blue-500" />
-                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">{league} Assets</span>
-                </div>
-
-                {/* TABLE */}
-                <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                    <table className="w-full text-left text-sm text-gray-400">
-                        <thead className="bg-gray-900/50 text-xs uppercase font-bold text-gray-500 border-b border-gray-700">
-                            <tr>
-                                <th className="px-6 py-4">Asset</th>
-                                <th className="px-6 py-4 text-right">Shares</th>
-                                <th className="px-6 py-4 text-right">Avg Cost</th>
-                                <th className="px-6 py-4 text-right">Price</th>
-                                <th className="px-6 py-4 text-right text-yellow-500">Total Divs</th>
-                                <th className="px-6 py-4 text-right">Return</th>
-                                {/* NEW HEADER: Total Gain */}
-                                <th className="px-6 py-4 text-right">Total Gain</th>
-                                <th className="px-6 py-4 text-right">Value</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-700">
-                            {assetsByLeague[league].map((row: any) => (
-                                <tr key={row.id} className="hover:bg-gray-700/30 transition">
-                                    <td className="px-6 py-4 font-bold text-white flex flex-col">
-                                        {row.name}
-                                        <span className="text-[10px] text-gray-500 font-normal">{row.ticker}</span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right font-mono text-gray-300">{row.shares}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-gray-500">${row.avgCost.toFixed(2)}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-white">${row.currentPrice.toFixed(2)}</td>
-                                    
-                                    <td className="px-6 py-4 text-right font-mono text-yellow-400 font-bold">
-                                        ${row.totalAssetDividends.toFixed(2)}
-                                    </td>
-
-                                    <td className="px-6 py-4 text-right">
-                                        <div className={`flex items-center justify-end gap-1 font-bold ${row.gainLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                            {row.gainLoss >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                                            {Math.abs(row.gainLossPercent).toFixed(2)}%
-                                        </div>
-                                    </td>
-                                    
-                                    {/* NEW COLUMN: Total Gain */}
-                                    <td className={`px-6 py-4 text-right font-mono font-bold ${row.totalGainRaw >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {row.totalGainRaw >= 0 ? '+' : ''}${row.totalGainRaw.toFixed(2)}
-                                    </td>
-
-                                    <td className="px-6 py-4 text-right font-mono font-bold text-white text-lg">${row.marketValue.toFixed(2)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+      {/* 2. CURRENT HOLDINGS (COLLAPSIBLE) */}
+      <div className="bg-gray-800/30 rounded-xl border border-gray-700/50 overflow-hidden">
+          <button 
+            onClick={() => setIsAssetsExpanded(!isAssetsExpanded)}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-800/50 transition bg-gray-900/20"
+          >
+              <div className="flex items-center gap-2">
+                <Filter size={16} className="text-gray-500" />
+                <span className="text-sm font-bold text-gray-300">Current Assets</span>
+                <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full ml-2">
+                    {Object.keys(holdings).length}
+                </span>
               </div>
-          )) : (
-              <div className="bg-gray-800 rounded-xl border border-gray-700 p-8 text-center text-gray-500">
-                 No assets owned.
+              {isAssetsExpanded ? <ChevronDown size={18} className="text-gray-400"/> : <ChevronRight size={18} className="text-gray-500"/>}
+          </button>
+
+          {isAssetsExpanded && (
+              <div className="p-4 pt-0 border-t border-gray-700/30">
+                  {Object.keys(assetsByLeague).length > 0 ? Object.keys(assetsByLeague).map((league) => (
+                      <div key={league} className="mt-4">
+                        {/* MARKET HEADER (COLLAPSIBLE) */}
+                        <button 
+                            onClick={() => toggleLeague(league)}
+                            className="w-full flex items-center gap-2 mb-2 px-1 hover:bg-gray-800/50 p-1 rounded transition text-left"
+                        >
+                            {expandedLeagues[league] 
+                                ? <ChevronDown size={14} className="text-blue-500" /> 
+                                : <ChevronRight size={14} className="text-gray-500" />
+                            }
+                            <Layers size={14} className="text-blue-500" />
+                            <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">{league} Assets</span>
+                        </button>
+
+                        {/* TABLE (Only if Expanded) */}
+                        {expandedLeagues[league] && (
+                            <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                                <table className="w-full text-left text-sm text-gray-400">
+                                    <thead className="bg-gray-900/50 text-xs uppercase font-bold text-gray-500 border-b border-gray-700">
+                                        <tr>
+                                            <th className="px-6 py-4">Asset</th>
+                                            <th className="px-6 py-4 text-right">Shares</th>
+                                            <th className="px-6 py-4 text-right">Avg Cost</th>
+                                            <th className="px-6 py-4 text-right">Price</th>
+                                            <th className="px-6 py-4 text-right text-yellow-500">Total Divs</th>
+                                            <th className="px-6 py-4 text-right">Return</th>
+                                            <th className="px-6 py-4 text-right">Total Gain</th>
+                                            <th className="px-6 py-4 text-right">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-700">
+                                        {assetsByLeague[league].map((row: any) => (
+                                            <tr key={row.id} className="hover:bg-gray-700/30 transition">
+                                                <td className="px-6 py-4 font-bold text-white flex flex-col">
+                                                    {row.name}
+                                                    <span className="text-[10px] text-gray-500 font-normal">{row.ticker}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-mono text-gray-300">{row.shares}</td>
+                                                <td className="px-6 py-4 text-right font-mono text-gray-500">${row.avgCost.toFixed(2)}</td>
+                                                <td className="px-6 py-4 text-right font-mono text-white">${row.currentPrice.toFixed(2)}</td>
+                                                
+                                                <td className="px-6 py-4 text-right font-mono text-yellow-400 font-bold">
+                                                    ${row.totalAssetDividends.toFixed(2)}
+                                                </td>
+
+                                                <td className="px-6 py-4 text-right">
+                                                    <div className={`flex items-center justify-end gap-1 font-bold ${row.gainLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                        {row.gainLoss >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                                                        {Math.abs(row.gainLossPercent).toFixed(2)}%
+                                                    </div>
+                                                </td>
+                                                
+                                                <td className={`px-6 py-4 text-right font-mono font-bold ${row.totalGainRaw >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {row.totalGainRaw >= 0 ? '+' : ''}${row.totalGainRaw.toFixed(2)}
+                                                </td>
+
+                                                <td className="px-6 py-4 text-right font-mono font-bold text-white text-lg">${row.marketValue.toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                      </div>
+                  )) : (
+                      <div className="bg-gray-800 rounded-xl border border-gray-700 p-8 text-center text-gray-500 mt-4">
+                         No assets owned.
+                      </div>
+                  )}
               </div>
           )}
       </div>
 
-      {/* 3. ACTIVITY LOG */}
-      <div>
-          <div className="flex items-center justify-between mb-4">
+      {/* 3. ACTIVITY LOG (COLLAPSIBLE) */}
+      <div className="bg-gray-800/30 rounded-xl border border-gray-700/50 overflow-hidden">
+          <button 
+            onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-800/50 transition bg-gray-900/20"
+          >
              <div className="flex items-center gap-2">
                 <History size={16} className="text-gray-500" />
                 <span className="text-sm font-bold text-gray-300">Transaction History</span>
              </div>
-             <div className="text-xs text-gray-500">
-                Showing {Math.min(visibleTxCount, allTransactions.length)} of {allTransactions.length}
-             </div>
-          </div>
+             {isHistoryExpanded ? <ChevronDown size={18} className="text-gray-400"/> : <ChevronRight size={18} className="text-gray-500"/>}
+          </button>
 
-          <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-             <table className="w-full text-left text-sm text-gray-400">
-                <thead className="bg-gray-900/50 text-xs uppercase font-bold text-gray-500 border-b border-gray-700">
-                    <tr>
-                        <th className="px-6 py-3">Date</th>
-                        <th className="px-6 py-3">Type</th>
-                        <th className="px-6 py-3">Details</th>
-                        <th className="px-6 py-3 text-right">Amount</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                    {allTransactions.slice(0, visibleTxCount).map((tx: any) => {
-                        const team = teams.find(t => t.id === tx.team_id);
-                        const isWin = tx.type === 'DIVIDEND';
-                        const isBuy = tx.type === 'BUY';
-                        
-                        return (
-                            <tr key={tx.id} className="hover:bg-gray-700/30">
-                                <td className="px-6 py-3 text-xs font-mono text-gray-500">
-                                    {new Date(tx.created_at).toLocaleDateString()} <span className="opacity-50">{new Date(tx.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                                </td>
-                                <td className="px-6 py-3">
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded ${
-                                        isWin ? 'bg-yellow-500/10 text-yellow-400' :
-                                        isBuy ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                                    }`}>
-                                        {tx.type}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-3 text-white">
-                                    {team?.name || 'Unknown Team'}
-                                    {isWin && (
-                                        <span className="text-gray-500 text-xs ml-2">
-                                            {tx.description 
-                                                ? `(${tx.description})` 
-                                                : `(Payout for ${tx.shares_amount} shares)`}
-                                        </span>
-                                    )}
-                                    {!isWin && <span className="text-gray-500 text-xs ml-2"> ({tx.shares_amount} shares @ ${tx.share_price.toFixed(2)})</span>}
-                                </td>
-                                <td className={`px-6 py-3 text-right font-mono font-bold ${isWin || !isBuy ? 'text-green-400' : 'text-gray-300'}`}>
-                                    {isBuy ? '-' : '+'}${tx.usd_amount.toFixed(2)}
-                                </td>
+          {isHistoryExpanded && (
+              <div className="p-4 pt-0 border-t border-gray-700/30">
+                  <div className="flex justify-between items-center mb-2 mt-4 px-1">
+                      <span className="text-xs text-gray-500 italic">Latest activity</span>
+                      <div className="text-xs text-gray-500">
+                        Showing {Math.min(visibleTxCount, allTransactions.length)} of {allTransactions.length}
+                      </div>
+                  </div>
+
+                  <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                     <table className="w-full text-left text-sm text-gray-400">
+                        <thead className="bg-gray-900/50 text-xs uppercase font-bold text-gray-500 border-b border-gray-700">
+                            <tr>
+                                <th className="px-6 py-3">Date</th>
+                                <th className="px-6 py-3">Type</th>
+                                <th className="px-6 py-3">Details</th>
+                                <th className="px-6 py-3 text-right">Amount</th>
                             </tr>
-                        );
-                    })}
-                    {allTransactions.length === 0 && (
-                        <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No transaction history.</td></tr>
-                    )}
-                </tbody>
-             </table>
-             
-             {visibleTxCount < allTransactions.length && (
-                 <button 
-                    onClick={() => setVisibleTxCount(prev => prev + 5)}
-                    className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-400 hover:text-white transition border-t border-gray-700 flex items-center justify-center gap-2"
-                 >
-                    Load More <ChevronDown size={14} />
-                 </button>
-             )}
-          </div>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700">
+                            {allTransactions.slice(0, visibleTxCount).map((tx: any) => {
+                                const team = teams.find(t => t.id === tx.team_id);
+                                const isWin = tx.type === 'DIVIDEND';
+                                const isBuy = tx.type === 'BUY';
+                                
+                                return (
+                                    <tr key={tx.id} className="hover:bg-gray-700/30">
+                                        <td className="px-6 py-3 text-xs font-mono text-gray-500">
+                                            {new Date(tx.created_at).toLocaleDateString()} <span className="opacity-50">{new Date(tx.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${
+                                                isWin ? 'bg-yellow-500/10 text-yellow-400' :
+                                                isBuy ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                                            }`}>
+                                                {tx.type}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-3 text-white">
+                                            {team?.name || 'Unknown Team'}
+                                            {isWin && (
+                                                <span className="text-gray-500 text-xs ml-2">
+                                                    {tx.description 
+                                                        ? `(${tx.description})` 
+                                                        : `(Payout for ${tx.shares_amount} shares)`}
+                                                </span>
+                                            )}
+                                            {!isWin && <span className="text-gray-500 text-xs ml-2"> ({tx.shares_amount} shares @ ${tx.share_price.toFixed(2)})</span>}
+                                        </td>
+                                        <td className={`px-6 py-3 text-right font-mono font-bold ${isWin || !isBuy ? 'text-green-400' : 'text-gray-300'}`}>
+                                            {isBuy ? '-' : '+'}${tx.usd_amount.toFixed(2)}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {allTransactions.length === 0 && (
+                                <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No transaction history.</td></tr>
+                            )}
+                        </tbody>
+                     </table>
+                     
+                     {visibleTxCount < allTransactions.length && (
+                         <button 
+                            onClick={() => setVisibleTxCount(prev => prev + 5)}
+                            className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-400 hover:text-white transition border-t border-gray-700 flex items-center justify-center gap-2"
+                         >
+                            Load More <ChevronDown size={14} />
+                         </button>
+                     )}
+                  </div>
+              </div>
+          )}
       </div>
 
     </div>
