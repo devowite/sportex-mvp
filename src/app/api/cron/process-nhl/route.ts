@@ -1,15 +1,32 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const NHL_API_BASE = 'https://api-web.nhle.com/v1';
+const ESPN_NHL_SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard';
+
+// TRANSLATION MAP: ESPN Ticker -> Your DB Ticker
+// (Matches the logic in your TeamCard.tsx)
+const TICKER_MAP: Record<string, string> = {
+    'TB': 'TBL',
+    'SJ': 'SJS',
+    'NJ': 'NJD',
+    'LA': 'LAK',
+    'WAS': 'WSH',
+    'MON': 'MTL',
+    'UTA': 'UTAH'
+};
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  // 1. SETUP ADMIN CLIENT (Bypasses RLS)
+  // 1. SETUP ADMIN CLIENT
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) {
+      return NextResponse.json({ success: false, error: "Missing Service Role Key" }, { status: 500 });
+  }
+  
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    serviceRoleKey
   );
 
   // 2. SECURITY CHECK
@@ -19,83 +36,91 @@ export async function GET(request: Request) {
   }
 
   try {
-    const log = [];
+    const log: string[] = [];
 
-    // --- PART A: UPDATE STANDINGS ---
-    const standingsRes = await fetch(`${NHL_API_BASE}/standings/now`);
-    const standingsData = await standingsRes.json();
-
-    for (const teamNode of standingsData.standings) {
-      const ticker = teamNode.teamAbbrev.default;
-      // Update stats
-      await supabaseAdmin.from('teams').update({ 
-          wins: teamNode.wins, 
-          losses: teamNode.losses, 
-          otl: teamNode.otLosses 
-      }).eq('ticker', ticker);
-    }
-
-    // --- PART B: PROCESS GAMES (Yesterday + Today) ---
+    // --- PART A: PROCESS GAMES (Yesterday + Today) ---
+    // We fetch a range to ensure we catch late-night games from yesterday
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
+    
+    // ESPN API handles date ranges nicely
+    const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
+    const datesParam = `${formatDate(yesterday)}-${formatDate(today)}`;
+    
+    const res = await fetch(`${ESPN_NHL_SCOREBOARD}?dates=${datesParam}`);
+    const data = await res.json();
+    const games = data.events || [];
 
-    const datesToCheck = [
-        yesterday.toISOString().split('T')[0],
-        today.toISOString().split('T')[0]
-    ];
+    for (const event of games) {
+      const competition = event.competitions[0];
+      const isCompleted = event.status.type.completed;
+      const gameId = String(event.id); // This is now the ESPN ID
 
-    for (const dateStr of datesToCheck) {
-        const scoreRes = await fetch(`${NHL_API_BASE}/score/${dateStr}`);
-        const scoreData = await scoreRes.json();
+      // --- 1. UPDATE STANDINGS (Wins/Losses) ---
+      // We do this for all games in the feed to keep records fresh
+      for (const competitor of competition.competitors) {
+        let ticker = competitor.team.abbreviation;
+        if (TICKER_MAP[ticker]) ticker = TICKER_MAP[ticker];
 
-        for (const game of scoreData.games) {
-            // 1. Check if game is Final
-            if (game.gameState === 'OFF' || game.gameState === 'FINAL') {
-                const gameId = String(game.id);
-
-                // 2. IDEMPOTENCY CHECK (Using Admin Client)
-                const { data: existing } = await supabaseAdmin
-                    .from('processed_games')
-                    .select('game_id')
-                    .eq('game_id', gameId)
-                    .maybeSingle(); // Safer than .single()
-
-                if (existing) continue; // Skip if already paid
-
-                // 3. Determine Winner
-                const home = game.homeTeam;
-                const away = game.awayTeam;
-                let winnerTicker = null;
-                
-                if (home.score > away.score) winnerTicker = home.abbrev;
-                else if (away.score > home.score) winnerTicker = away.abbrev;
-
-                if (winnerTicker) {
-                    // 4. Pay Winner
-                    const { data: teamData } = await supabaseAdmin
-                        .from('teams')
-                        .select('id, name')
-                        .eq('ticker', winnerTicker)
-                        .eq('league', 'NHL')
-                        .single();
-
-                    if (teamData) {
-                        await supabaseAdmin.rpc('simulate_win', { p_team_id: teamData.id });
-                        log.push(`Paid out: ${teamData.name} (${winnerTicker})`);
-                    }
-                }
-
-                // 5. MARK AS PROCESSED (Fixing the NFL label bug here)
-                await supabaseAdmin.from('processed_games').insert({ 
-                    game_id: gameId, 
-                    league: 'NHL' 
-                });
+        // ESPN NHL records are often in the 'statistics' array or records array
+        // We try to find the 'overall' record
+        const recordObj = competitor.records?.find((r: any) => r.name === 'overall');
+        if (recordObj) {
+            const recordString = recordObj.summary; // e.g. "10-5-2"
+            const parts = recordString.split('-');
+            if (parts.length >= 2) {
+                await supabaseAdmin
+                    .from('teams')
+                    .update({ 
+                        wins: parseInt(parts[0])||0, 
+                        losses: parseInt(parts[1])||0, 
+                        otl: parseInt(parts[2])||0 
+                    })
+                    .eq('ticker', ticker)
+                    .eq('league', 'NHL');
             }
         }
+      }
+
+      // --- 2. PROCESS PAYOUTS ---
+      if (isCompleted) {
+        // A. IDEMPOTENCY CHECK
+        const { data: existing } = await supabaseAdmin
+            .from('processed_games')
+            .select('game_id')
+            .eq('game_id', gameId)
+            .limit(1)
+            .maybeSingle();
+
+        if (!existing) {
+            // B. FIND WINNER
+            const winner = competition.competitors.find((c: any) => c.winner === true);
+            
+            if (winner) {
+                let winnerTicker = winner.team.abbreviation;
+                if (TICKER_MAP[winnerTicker]) winnerTicker = TICKER_MAP[winnerTicker];
+
+                const { data: teamData } = await supabaseAdmin
+                    .from('teams')
+                    .select('id, name')
+                    .eq('ticker', winnerTicker)
+                    .eq('league', 'NHL')
+                    .single();
+
+                if (teamData) {
+                    await supabaseAdmin.rpc('simulate_win', { p_team_id: teamData.id });
+                    log.push(`PAYOUT SUCCESS: ${teamData.name} (${winnerTicker})`);
+                }
+            }
+            
+            // C. REMEMBER GAME (Now storing ESPN ID)
+            await supabaseAdmin.from('processed_games').insert({ game_id: gameId, league: 'NHL' });
+        }
+      }
     }
 
-    return NextResponse.json({ success: true, updates: log });
+    return NextResponse.json({ success: true, logs: log });
 
   } catch (error: any) {
     console.error("NHL Cron Error:", error);
