@@ -89,7 +89,6 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
           if (espnTicker === 'LA') return 'LAK'; 
           if (espnTicker === 'WAS') return 'WSH'; 
           if (espnTicker === 'MON') return 'MTL';
-          if (espnTicker === 'UTA') return 'UTAH';
       } else if (league === 'NFL') {
           if (espnTicker === 'WAS') return 'WSH';
           if (espnTicker === 'JAC') return 'JAX';
@@ -217,10 +216,11 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
         let sport = 'football/nfl';
         if (team.league === 'NHL') sport = 'hockey/nhl';
         let searchTicker = team.ticker;
-        if (team.league === 'NFL') {
-            if(searchTicker === 'WSH') searchTicker = 'WAS';
-            if(searchTicker === 'JAX') searchTicker = 'JAC';
+        // Fix NHL: ESPN needs 'LA' for Kings, but DB has 'LAK'
+        if (team.league === 'NHL') {
+            if(searchTicker === 'LAK') searchTicker = 'LA';
         }
+        // Fix NFL: Removed swaps because ESPN API actually expects 'WSH' and 'JAX'
 
         const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/teams/${searchTicker}/schedule`);
         const data = await res.json();
@@ -263,10 +263,11 @@ export default function TeamCard({ team, myShares, onTrade, onSimWin, userId }: 
         let sport = 'football/nfl';
         if (team.league === 'NHL') sport = 'hockey/nhl';
         let searchTicker = team.ticker;
-        if (team.league === 'NFL') {
-            if(searchTicker === 'WSH') searchTicker = 'WAS';
-            if(searchTicker === 'JAX') searchTicker = 'JAC';
+        // Fix NHL: ESPN needs 'LA' for Kings, but DB has 'LAK'
+        if (team.league === 'NHL') {
+            if(searchTicker === 'LAK') searchTicker = 'LA';
         }
+        // Fix NFL: Removed swaps because ESPN API actually expects 'WSH' and 'JAX'
 
         const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/teams/${searchTicker}/schedule`);
         const data = await res.json();

@@ -5,19 +5,18 @@ const ESPN_NHL_SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/hocke
 
 const TICKER_MAP: Record<string, string> = {
     'TB': 'TBL', 'SJ': 'SJS', 'NJ': 'NJD', 'LA': 'LAK', 
-    'WAS': 'WSH', 'MON': 'MTL', 'UTA': 'UTAH'
+    'WAS': 'WSH', 'MON': 'MTL' 
+    // Removed 'UTA': 'UTAH' so it stays as 'UTA' in your DB
 };
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  // 1. SETUP ADMIN CLIENT
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) return NextResponse.json({ success: false, error: "Missing Key" }, { status: 500 });
   
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
 
-  // 2. SECURITY CHECK
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
@@ -26,8 +25,8 @@ export async function GET(request: Request) {
   try {
     const log: string[] = [];
     const now = new Date();
-
-    // --- FETCH RANGE: Yesterday to +7 Days ---
+    
+    // Check Yesterday + Next 7 Days (To handle payouts AND schedule updates)
     const start = new Date(now);
     start.setDate(start.getDate() - 1);
     const end = new Date(now);
@@ -40,53 +39,38 @@ export async function GET(request: Request) {
     const data = await res.json();
     const games = data.events || [];
 
-    // Track teams we have handled so we don't overwrite "Today's" game with "Tomorrow's"
+    // Track updates so we don't overwrite "Today's Game" with "Tomorrow's Game"
     const scheduleUpdated = new Set<string>();
 
     for (const event of games) {
       const competition = event.competitions[0];
       const isCompleted = event.status.type.completed;
-      const state = event.status.type.state; // 'pre', 'in', 'post'
+      const state = event.status.type.state;
       const gameId = String(event.id); 
       const gameDate = new Date(event.date);
 
-      // --- 1. IDENTIFY TEAMS ---
       const homeTeam = competition.competitors.find((c: any) => c.homeAway === 'home');
       const awayTeam = competition.competitors.find((c: any) => c.homeAway === 'away');
       
-      // Normalize Tickers
       let homeTicker = homeTeam.team.abbreviation;
       if (TICKER_MAP[homeTicker]) homeTicker = TICKER_MAP[homeTicker];
       let awayTicker = awayTeam.team.abbreviation;
       if (TICKER_MAP[awayTicker]) awayTicker = TICKER_MAP[awayTicker];
 
-      // --- 2. "LOCK" SCHEDULE FOR ACTIVE GAMES ---
-      // If game is LIVE ('in') or FINAL ('post') but happened recently (< 12 hours ago), 
-      // we mark these teams as "Updated" so the future-game logic below DOES NOT overwrite them.
-      // This ensures the frontend keeps seeing "Today's" game to show the score.
+      // --- 1. LOCK LOGIC: If Live or Recently Final, Keep this game in DB ---
       const hoursSinceStart = (now.getTime() - gameDate.getTime()) / (1000 * 60 * 60);
-      
-      // If it's Live OR (Final and less than 12 hours old)
       if (state === 'in' || (state === 'post' && hoursSinceStart < 12)) {
           scheduleUpdated.add(homeTicker);
           scheduleUpdated.add(awayTicker);
-          // Ensure DB has THIS game date (fix for if it was previously wrong)
-          await supabaseAdmin.from('teams').update({
-             next_opponent: awayTicker,
-             next_game_at: gameDate.toISOString()
-          }).eq('ticker', homeTicker).eq('league', 'NHL');
-
-          await supabaseAdmin.from('teams').update({
-             next_opponent: homeTicker,
-             next_game_at: gameDate.toISOString()
-          }).eq('ticker', awayTicker).eq('league', 'NHL');
+          // Force DB to show THIS game
+          await supabaseAdmin.from('teams').update({ next_opponent: awayTicker, next_game_at: gameDate.toISOString() }).eq('ticker', homeTicker).eq('league', 'NHL');
+          await supabaseAdmin.from('teams').update({ next_opponent: homeTicker, next_game_at: gameDate.toISOString() }).eq('ticker', awayTicker).eq('league', 'NHL');
       }
 
-      // --- 3. UPDATE RECORDS (Always run) ---
+      // --- 2. UPDATE RECORDS ---
       for (const competitor of competition.competitors) {
         let ticker = competitor.team.abbreviation;
         if (TICKER_MAP[ticker]) ticker = TICKER_MAP[ticker];
-
         const recordObj = competitor.records?.find((r: any) => r.name === 'overall');
         if (recordObj) {
             const parts = recordObj.summary.split('-');
@@ -98,8 +82,7 @@ export async function GET(request: Request) {
         }
       }
 
-      // --- 4. UPDATE SCHEDULE (Future Games Only) ---
-      // Only run this if we haven't already "locked" the team with a Live/Recent game above
+      // --- 3. UPDATE SCHEDULE (Future Games) ---
       if (!isCompleted && gameDate > now) {
          if (homeTeam && awayTeam) {
              const updateSchedule = async (tTicker: string, oppTicker: string) => {
@@ -107,8 +90,7 @@ export async function GET(request: Request) {
                      await supabaseAdmin.from('teams').update({
                          next_opponent: oppTicker,
                          next_game_at: gameDate.toISOString()
-                     }).eq('ticker', tTicker).eq('league', 'NHL'); // STRICT LEAGUE CHECK
-                     
+                     }).eq('ticker', tTicker).eq('league', 'NHL');
                      scheduleUpdated.add(tTicker);
                  }
              };
@@ -117,7 +99,7 @@ export async function GET(request: Request) {
          }
       }
 
-      // --- 5. PROCESS PAYOUTS (Final Games Only) ---
+      // --- 4. PAYOUTS ---
       if (isCompleted) {
         const { data: existing } = await supabaseAdmin.from('processed_games').select('game_id').eq('game_id', gameId).limit(1).maybeSingle();
 
@@ -137,7 +119,6 @@ export async function GET(request: Request) {
         }
       }
     }
-
     return NextResponse.json({ success: true, logs: log });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
