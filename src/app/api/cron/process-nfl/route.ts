@@ -28,16 +28,43 @@ export async function GET(request: Request) {
     const data = await res.json();
     const games = data.events || [];
     
-    // Track updates to prevent overwriting with later games in the same feed
     const scheduleUpdated = new Set<string>();
 
     for (const event of games) {
       const competition = event.competitions[0];
       const isCompleted = event.status.type.completed;
+      const state = event.status.type.state;
       const gameId = String(event.id);
       const gameDate = new Date(event.date);
 
-      // --- 1. UPDATE RECORDS --- 
+      const homeTeam = competition.competitors.find((c: any) => c.homeAway === 'home');
+      const awayTeam = competition.competitors.find((c: any) => c.homeAway === 'away');
+
+      let homeTicker = homeTeam.team.abbreviation;
+      if (TICKER_MAP[homeTicker]) homeTicker = TICKER_MAP[homeTicker];
+      let awayTicker = awayTeam.team.abbreviation;
+      if (TICKER_MAP[awayTicker]) awayTicker = TICKER_MAP[awayTicker];
+
+      // --- 1. LOCK SCHEDULE FOR ACTIVE/RECENT GAMES ---
+      const hoursSinceStart = (now.getTime() - gameDate.getTime()) / (1000 * 60 * 60);
+      
+      // If Live or (Final < 12 hours ago) -> Keep this game in DB
+      if (state === 'in' || (state === 'post' && hoursSinceStart < 12)) {
+          scheduleUpdated.add(homeTicker);
+          scheduleUpdated.add(awayTicker);
+          
+          await supabaseAdmin.from('teams').update({
+             next_opponent: awayTicker,
+             next_game_at: gameDate.toISOString()
+          }).eq('ticker', homeTicker).eq('league', 'NFL');
+
+          await supabaseAdmin.from('teams').update({
+             next_opponent: homeTicker,
+             next_game_at: gameDate.toISOString()
+          }).eq('ticker', awayTicker).eq('league', 'NFL');
+      }
+
+      // --- 2. UPDATE RECORDS --- 
       for (const competitor of competition.competitors) {
         let ticker = competitor.team.abbreviation;
         if (TICKER_MAP[ticker]) ticker = TICKER_MAP[ticker];
@@ -48,37 +75,28 @@ export async function GET(request: Request) {
         
         await supabaseAdmin.from('teams').update({ 
             wins: parseInt(parts[0])||0, losses: parseInt(parts[1])||0, otl: parseInt(parts[2])||0 
-        }).eq('ticker', ticker).eq('league', 'NFL'); // STRICT LEAGUE CHECK
+        }).eq('ticker', ticker).eq('league', 'NFL');
       }
 
-      // --- 2. UPDATE SCHEDULE (Future Games) ---
+      // --- 3. UPDATE SCHEDULE (Future) ---
       if (!isCompleted && gameDate > now) {
-         const homeTeam = competition.competitors.find((c: any) => c.homeAway === 'home');
-         const awayTeam = competition.competitors.find((c: any) => c.homeAway === 'away');
-
          if (homeTeam && awayTeam) {
-             const updateSchedule = async (teamData: any, opponentData: any) => {
-                 let tTicker = teamData.team.abbreviation;
-                 if (TICKER_MAP[tTicker]) tTicker = TICKER_MAP[tTicker];
-                 
+             const updateSchedule = async (tTicker: string, oppTicker: string) => {
                  if (!scheduleUpdated.has(tTicker)) {
-                     let oppTicker = opponentData.team.abbreviation;
-                     if (TICKER_MAP[oppTicker]) oppTicker = TICKER_MAP[oppTicker];
-
                      await supabaseAdmin.from('teams').update({
                          next_opponent: oppTicker,
                          next_game_at: gameDate.toISOString()
-                     }).eq('ticker', tTicker).eq('league', 'NFL'); // STRICT LEAGUE CHECK
+                     }).eq('ticker', tTicker).eq('league', 'NFL');
                      
                      scheduleUpdated.add(tTicker);
                  }
              };
-             await updateSchedule(homeTeam, awayTeam);
-             await updateSchedule(awayTeam, homeTeam);
+             await updateSchedule(homeTicker, awayTicker);
+             await updateSchedule(awayTicker, homeTicker);
          }
       }
 
-      // --- 3. PAYOUTS ---
+      // --- 4. PAYOUTS ---
       if (isCompleted) {
         const { data: existing } = await supabaseAdmin.from('processed_games').select('game_id').eq('game_id', gameId).limit(1).maybeSingle();
 

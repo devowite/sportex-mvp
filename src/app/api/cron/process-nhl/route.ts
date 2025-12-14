@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const log: string[] = [];
     const now = new Date();
 
-    // --- FETCH RANGE: Yesterday (for payouts) to +7 Days (for schedule) ---
+    // --- FETCH RANGE: Yesterday to +7 Days ---
     const start = new Date(now);
     start.setDate(start.getDate() - 1);
     const end = new Date(now);
@@ -40,16 +40,49 @@ export async function GET(request: Request) {
     const data = await res.json();
     const games = data.events || [];
 
-    // Track teams we've already found a "Next Game" for in this loop
+    // Track teams we have handled so we don't overwrite "Today's" game with "Tomorrow's"
     const scheduleUpdated = new Set<string>();
 
     for (const event of games) {
       const competition = event.competitions[0];
       const isCompleted = event.status.type.completed;
+      const state = event.status.type.state; // 'pre', 'in', 'post'
       const gameId = String(event.id); 
       const gameDate = new Date(event.date);
 
-      // --- 1. UPDATE STANDINGS (Always run) ---
+      // --- 1. IDENTIFY TEAMS ---
+      const homeTeam = competition.competitors.find((c: any) => c.homeAway === 'home');
+      const awayTeam = competition.competitors.find((c: any) => c.homeAway === 'away');
+      
+      // Normalize Tickers
+      let homeTicker = homeTeam.team.abbreviation;
+      if (TICKER_MAP[homeTicker]) homeTicker = TICKER_MAP[homeTicker];
+      let awayTicker = awayTeam.team.abbreviation;
+      if (TICKER_MAP[awayTicker]) awayTicker = TICKER_MAP[awayTicker];
+
+      // --- 2. "LOCK" SCHEDULE FOR ACTIVE GAMES ---
+      // If game is LIVE ('in') or FINAL ('post') but happened recently (< 12 hours ago), 
+      // we mark these teams as "Updated" so the future-game logic below DOES NOT overwrite them.
+      // This ensures the frontend keeps seeing "Today's" game to show the score.
+      const hoursSinceStart = (now.getTime() - gameDate.getTime()) / (1000 * 60 * 60);
+      
+      // If it's Live OR (Final and less than 12 hours old)
+      if (state === 'in' || (state === 'post' && hoursSinceStart < 12)) {
+          scheduleUpdated.add(homeTicker);
+          scheduleUpdated.add(awayTicker);
+          // Ensure DB has THIS game date (fix for if it was previously wrong)
+          await supabaseAdmin.from('teams').update({
+             next_opponent: awayTicker,
+             next_game_at: gameDate.toISOString()
+          }).eq('ticker', homeTicker).eq('league', 'NHL');
+
+          await supabaseAdmin.from('teams').update({
+             next_opponent: homeTicker,
+             next_game_at: gameDate.toISOString()
+          }).eq('ticker', awayTicker).eq('league', 'NHL');
+      }
+
+      // --- 3. UPDATE RECORDS (Always run) ---
       for (const competitor of competition.competitors) {
         let ticker = competitor.team.abbreviation;
         if (TICKER_MAP[ticker]) ticker = TICKER_MAP[ticker];
@@ -60,26 +93,17 @@ export async function GET(request: Request) {
             if (parts.length >= 2) {
                 await supabaseAdmin.from('teams').update({ 
                     wins: parseInt(parts[0])||0, losses: parseInt(parts[1])||0, otl: parseInt(parts[2])||0 
-                }).eq('ticker', ticker).eq('league', 'NHL'); // STRICT LEAGUE CHECK
+                }).eq('ticker', ticker).eq('league', 'NHL');
             }
         }
       }
 
-      // --- 2. UPDATE SCHEDULE (Future Games Only) ---
+      // --- 4. UPDATE SCHEDULE (Future Games Only) ---
+      // Only run this if we haven't already "locked" the team with a Live/Recent game above
       if (!isCompleted && gameDate > now) {
-         const homeTeam = competition.competitors.find((c: any) => c.homeAway === 'home');
-         const awayTeam = competition.competitors.find((c: any) => c.homeAway === 'away');
-
          if (homeTeam && awayTeam) {
-             const updateSchedule = async (teamData: any, opponentData: any) => {
-                 let tTicker = teamData.team.abbreviation;
-                 if (TICKER_MAP[tTicker]) tTicker = TICKER_MAP[tTicker];
-                 
-                 // Only update if we haven't found a sooner game in this loop
+             const updateSchedule = async (tTicker: string, oppTicker: string) => {
                  if (!scheduleUpdated.has(tTicker)) {
-                     let oppTicker = opponentData.team.abbreviation;
-                     if (TICKER_MAP[oppTicker]) oppTicker = TICKER_MAP[oppTicker]; // Normalize opponent too
-
                      await supabaseAdmin.from('teams').update({
                          next_opponent: oppTicker,
                          next_game_at: gameDate.toISOString()
@@ -88,15 +112,13 @@ export async function GET(request: Request) {
                      scheduleUpdated.add(tTicker);
                  }
              };
-
-             await updateSchedule(homeTeam, awayTeam);
-             await updateSchedule(awayTeam, homeTeam);
+             await updateSchedule(homeTicker, awayTicker);
+             await updateSchedule(awayTicker, homeTicker);
          }
       }
 
-      // --- 3. PROCESS PAYOUTS (Final Games Only) ---
+      // --- 5. PROCESS PAYOUTS (Final Games Only) ---
       if (isCompleted) {
-        // IDEMPOTENCY
         const { data: existing } = await supabaseAdmin.from('processed_games').select('game_id').eq('game_id', gameId).limit(1).maybeSingle();
 
         if (!existing) {
