@@ -59,7 +59,7 @@ export async function GET(request: Request) {
 
       // --- 1. LOCK LOGIC: If Live or Recently Final, Keep this game in DB ---
       const hoursSinceStart = (now.getTime() - gameDate.getTime()) / (1000 * 60 * 60);
-      if (state === 'in' || (state === 'post' && hoursSinceStart < 12)) {
+      if (state === 'in' || (state === 'post' && hoursSinceStart < 6)) {
           scheduleUpdated.add(homeTicker);
           scheduleUpdated.add(awayTicker);
           // Force DB to show THIS game

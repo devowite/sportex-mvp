@@ -64,7 +64,7 @@ export async function GET(request: Request) {
       // This prevents the "Update Schedule" block below from overwriting it with next week's game.
       const hoursSinceStart = (now.getTime() - gameDate.getTime()) / (1000 * 60 * 60);
       
-      if (state === 'in' || (state === 'post' && hoursSinceStart < 12)) {
+      if (state === 'in' || (state === 'post' && hoursSinceStart < 6)) {
           scheduleUpdated.add(homeTicker);
           scheduleUpdated.add(awayTicker);
           
