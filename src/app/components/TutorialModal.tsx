@@ -21,7 +21,7 @@ export default function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
         <div className="space-y-4 text-center">
           <p className="text-lg text-white font-bold">The First Live Sports Stock Market.</p>
           <p className="text-sm text-gray-400">
-            Instead of betting on odds that disappear after the game, you buy <span className="text-blue-300 font-bold">Real Shares</span> of teams.
+            Instead of betting on odds that disappear after the game, you buy <span className="text-blue-300 font-bold">Shares</span> of teams.
           </p>
           <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-left text-sm space-y-2">
             <div className="flex items-center gap-2">
@@ -66,12 +66,12 @@ export default function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
       content: (
         <div className="space-y-4 text-center">
           <p className="text-sm text-gray-300">
-            Every team has a <span className="text-yellow-400 font-bold">Dividend Bank</span> that grows over time.
+            Every team has a <span className="text-yellow-400 font-bold">Dividend Pot</span> that grows over time.
           </p>
           <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl relative overflow-hidden">
             <div className="text-2xl font-bold text-white mb-1">Win = Payout</div>
             <p className="text-xs text-yellow-200">
-              When your team wins a game, <strong>50%</strong> of their Bank is paid out immediately to shareholders.
+              When your team wins a game, their Dividend Pot is paid out immediately to shareholders.
             </p>
           </div>
           <p className="text-xs text-gray-500">
@@ -89,7 +89,7 @@ export default function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
             <Lock size={16} className="text-red-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold text-white block">Market Locks During Games</span>
-              Trading is disabled while the team is playing. You cannot buy/sell until the game ends (Final).
+              Trading is disabled while the team is playing. You cannot buy until the game ends, but you can continue to sell.
             </div>
           </div>
           <div className="flex items-start gap-3 bg-black/30 p-3 rounded-lg border border-white/10">

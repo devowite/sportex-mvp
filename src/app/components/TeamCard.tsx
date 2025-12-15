@@ -569,7 +569,13 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                         <p className="text-[9px] text-gray-600 text-center py-2">Loading...</p>
                     ) : next5Games.map((g, i) => (
                         <div key={i} className="flex justify-between items-center text-[10px] px-2 py-1 rounded hover:bg-white/5">
-                            <span className="text-gray-300 font-bold">{g.opp}</span>
+                            {/* Opponent + Record Stacked */}
+                            <div className="flex flex-col leading-none gap-0.5">
+                                <span className="text-gray-300 font-bold">{g.opp}</span>
+                                <span className="text-[8px] text-gray-500 font-mono">{g.record}</span>
+                            </div>
+                            
+                            {/* Date */}
                             <span className="text-gray-500 font-mono">{g.date}</span>
                         </div>
                     ))}
