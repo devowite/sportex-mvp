@@ -14,7 +14,7 @@ export default function MarketStats({ marketCap, volume24hShares, volume24hDolla
   
   // Helper to render a stat card
   const StatCard = ({ icon: Icon, label, value, subtext, color, tooltip }: any) => (
-    <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-xl flex flex-col gap-1 backdrop-blur-sm relative group cursor-help">
+    <div className="bg-black/40 border border-white/10 p-4 rounded-xl flex flex-col gap-1 backdrop-blur-md relative group cursor-help transition hover:border-white/20">
       
       {/* Label Row */}
       <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">

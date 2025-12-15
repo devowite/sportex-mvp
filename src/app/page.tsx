@@ -212,74 +212,76 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#1a0b2e] to-[#432818] text-white overflow-hidden">
       
-      {/* SIDEBAR */}
-      <aside className="w-20 bg-white border-r border-gray-200 flex flex-col items-center py-6 gap-8 z-20 justify-between shadow-xl">
-    <div className="flex flex-col items-center gap-8 w-full">
-        {/* LOGO AREA */}
-        <div className="h-12 w-12 flex items-center justify-center">
-            <img src="/logo.png" alt="Tradium" className="h-full w-full object-contain" />
+      {/* SIDEBAR (Dark Glass) */}
+      <aside className="w-20 bg-black/20 backdrop-blur-xl border-r border-white/10 flex flex-col items-center py-6 gap-8 z-20 justify-between">
+        <div className="flex flex-col items-center gap-8 w-full">
+            {/* APP LOGO */}
+            <div className="h-12 w-12 flex items-center justify-center">
+                <img 
+                    src="/logo.png" 
+                    alt="Tradium" 
+                    className="h-full w-full object-contain" 
+                />
+            </div>
+            
+            <nav className="flex flex-col gap-6 w-full px-2">
+                <button onClick={() => setActiveTab('MARKETS')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition ${activeTab === 'MARKETS' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+                    <LayoutGrid size={24} /> <span className="text-[10px] font-bold">Markets</span>
+                </button>
+                <button onClick={() => setActiveTab('PORTFOLIO')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition ${activeTab === 'PORTFOLIO' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+                    <Briefcase size={24} /> <span className="text-[10px] font-bold">Portfolio</span>
+                </button>
+                <button onClick={() => setActiveTab('PROFILE')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition ${activeTab === 'PROFILE' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+                    <User size={24} /> <span className="text-[10px] font-bold">Profile</span>
+                </button>
+                
+                {/* ADMIN BUTTON */}
+                {user?.is_admin && (
+                    <button 
+                        onClick={() => router.push('/admin')}
+                        className="p-3 rounded-xl flex flex-col items-center gap-1 transition bg-red-500/10 text-red-400 hover:bg-red-500/20 mt-4 border border-red-500/20"
+                    >
+                        <Shield size={24} /> <span className="text-[10px] font-bold">Admin</span>
+                    </button>
+                )}
+            </nav>
         </div>
         
-        <nav className="flex flex-col gap-6 w-full px-2">
-            {/* BUTTONS: Note the text color changes for the white background */}
-            <button onClick={() => setActiveTab('MARKETS')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition ${activeTab === 'MARKETS' ? 'bg-[#562171]/10 text-[#562171]' : 'text-gray-400 hover:text-[#562171] hover:bg-gray-50'}`}>
-                <LayoutGrid size={24} /> <span className="text-[10px] font-bold">Markets</span>
-            </button>
-            <button onClick={() => setActiveTab('PORTFOLIO')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition ${activeTab === 'PORTFOLIO' ? 'bg-[#562171]/10 text-[#562171]' : 'text-gray-400 hover:text-[#562171] hover:bg-gray-50'}`}>
-                <Briefcase size={24} /> <span className="text-[10px] font-bold">Portfolio</span>
-            </button>
-            <button onClick={() => setActiveTab('PROFILE')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition ${activeTab === 'PROFILE' ? 'bg-[#562171]/10 text-[#562171]' : 'text-gray-400 hover:text-[#562171] hover:bg-gray-50'}`}>
-                <User size={24} /> <span className="text-[10px] font-bold">Profile</span>
-            </button>
-            
-            {/* ADMIN BUTTON */}
-            {user?.is_admin && (
-                <button 
-                    onClick={() => router.push('/admin')}
-                    className="p-3 rounded-xl flex flex-col items-center gap-1 transition bg-red-50 text-red-500 hover:bg-red-100 mt-4 border border-red-100"
-                >
-                    <Shield size={24} /> <span className="text-[10px] font-bold">Admin</span>
-                </button>
-            )}
-        </nav>
-    </div>
-    
-    {/* LOGOUT */}
-    <button onClick={handleLogout} className="flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-red-500 transition group">
-        <div className="p-2 rounded-lg group-hover:bg-red-50 transition"><LogOut size={20} /></div>
-        <span className="text-[9px] font-bold uppercase tracking-wide">Logout</span>
-    </button>
-</aside>
+        {/* LOGOUT */}
+        <button onClick={handleLogout} className="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-red-400 transition group">
+            <div className="p-2 rounded-lg group-hover:bg-red-500/10 transition"><LogOut size={20} /></div>
+            <span className="text-[9px] font-bold uppercase tracking-wide">Logout</span>
+        </button>
+      </aside>
 
-      {/* MARKETS SUB-SIDEBAR (Collapsible) */}
+      {/* MARKETS SUB-SIDEBAR (Dark Glass Collapsible) */}
       {activeTab === 'MARKETS' && (
-        <aside className="w-20 hover:w-64 transition-all duration-300 ease-in-out bg-white/95 backdrop-blur border-r border-gray-200 flex flex-col z-10 group overflow-hidden shadow-lg">
-        <div className="p-6 border-b border-gray-100 whitespace-nowrap flex flex-col justify-center h-24">
-            <h2 className="text-xl font-bold text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">Markets</h2>
-            <p className="text-sm text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">Select a league</p>
-        </div>
-        <div className="p-4 space-y-2">
-        {['NHL', 'NFL'].map((league) => (
+        <aside className="w-20 hover:w-64 transition-all duration-300 ease-in-out bg-black/30 backdrop-blur-xl border-r border-white/10 flex flex-col z-10 group overflow-hidden">
+            <div className="p-6 border-b border-white/10 whitespace-nowrap flex flex-col justify-center h-24">
+                <h2 className="text-xl font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">Markets</h2>
+                <p className="text-sm text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">Select a league</p>
+            </div>
+            <div className="p-4 space-y-2">
+                {['NHL', 'NFL'].map((league) => (
                     <button
                         key={league}
                         onClick={() => setSelectedLeague(league as any)}
                         disabled={!activeLeagues.includes(league)}
                         className={`w-full h-12 rounded-lg font-bold flex items-center justify-center group-hover:justify-start group-hover:px-4 transition-all ${
                             selectedLeague === league 
-                            ? 'bg-[#562171] text-white shadow-md' 
+                            ? 'bg-[#562171] text-white shadow-md' // Brand Purple Active
                             : activeLeagues.includes(league)
-                                ? 'bg-gray-50 text-gray-800 hover:bg-gray-100 hover:text-[#562171]'
-                                : 'bg-transparent text-gray-300 cursor-not-allowed'
+                                ? 'bg-transparent text-gray-400 hover:bg-white/5 hover:text-white'
+                                : 'bg-transparent text-gray-600 cursor-not-allowed'
                         }`}
                     >
                         <div className="flex items-center gap-3">
-                            {/* NHL LOGO */}
+                            {/* NHL LOGO (No filter needed for dark mode) */}
                             {league === 'NHL' && (
                                 <img 
                                     src="https://assets.nhle.com/logos/nhl/svg/NHL_light.svg" 
                                     alt="NHL" 
-                                    // FIX: Use brightness-0 to turn the white logo black when inactive
-                                    className={`h-6 w-6 object-contain flex-shrink-0 transition-all ${selectedLeague === league ? '' : 'brightness-0 opacity-70'}`} 
+                                    className="h-6 w-6 object-contain flex-shrink-0" 
                                 />
                             )}
                             {/* NFL LOGO */}
@@ -298,19 +300,19 @@ export default function Home() {
                         </div>
                     </button>
                 ))}
-        </div>
-    </aside>
+            </div>
+        </aside>
       )}
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div className="h-16 border-b border-gray-800 flex justify-between items-center px-8 bg-gray-900/50 backdrop-blur shrink-0">
+        <div className="h-16 border-b border-white/10 flex justify-between items-center px-8 bg-black/20 backdrop-blur shrink-0">
             <div className="flex items-center gap-6">
                 <h2 className="text-lg font-bold text-gray-200">
                     {activeTab === 'MARKETS' ? `${selectedLeague} Market` : activeTab}
                 </h2>
                 {activeTab === 'MARKETS' && (
-                    <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1 border border-gray-700">
+                    <div className="flex items-center gap-2 bg-black/40 rounded-lg p-1 border border-white/10">
                         <span className="text-xs text-gray-500 font-bold px-2 flex items-center gap-1">
                             <ArrowUpDown size={12} /> Sort:
                         </span>
@@ -320,7 +322,7 @@ export default function Home() {
                                 onClick={() => setSortBy(opt)}
                                 className={`text-[10px] font-bold px-3 py-1 rounded transition ${
                                     sortBy === opt 
-                                    ? 'bg-gray-700 text-white shadow' 
+                                    ? 'bg-white/10 text-white shadow' 
                                     : 'text-gray-400 hover:text-white'
                                 }`}
                             >
@@ -334,7 +336,7 @@ export default function Home() {
             {/* CLICKABLE BALANCE */}
             <div 
                 onClick={() => setIsWalletOpen(true)}
-                className="flex items-center gap-3 bg-gray-800 px-4 py-2 rounded-full border border-gray-700 cursor-pointer hover:bg-gray-700 transition"
+                className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/10 cursor-pointer hover:bg-white/5 transition"
             >
                 <CircleDollarSign size={16} className="text-green-400" />
                 <span className="font-mono font-bold text-green-400">${user ? user.usd_balance.toFixed(2) : '---'}</span>
@@ -385,7 +387,7 @@ export default function Home() {
                                         />
                                     ))}
                                 </div>
-                                <div className="h-px bg-gray-800 w-full my-8"></div>
+                                <div className="h-px bg-white/10 w-full my-8"></div>
                             </div>
                         )}
                         <div>
@@ -419,8 +421,8 @@ export default function Home() {
             team={selectedTeam} 
             isOpen={true} 
             userId={user?.id}
-            userBalance={user?.usd_balance || 0} // Fix: Pass balance directly
-            userShares={holdings[selectedTeam.id] || 0} // Fix: Pass shares directly
+            userBalance={user?.usd_balance || 0} 
+            userShares={holdings[selectedTeam.id] || 0}
             onClose={() => setSelectedTeam(null)} 
             onSuccess={reloadData} 
         />

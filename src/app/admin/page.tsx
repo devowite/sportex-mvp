@@ -138,7 +138,7 @@ export default function AdminPage() {
 
       {/* STATS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 relative overflow-hidden">
+        <div className="bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10 text-green-500"><DollarSign size={64} /></div>
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total House Revenue</p>
             <h2 className="text-3xl font-mono text-green-400 font-bold">
@@ -147,7 +147,7 @@ export default function AdminPage() {
             <p className="text-xs text-gray-500 mt-2">Accumulated 5% fees from buys</p>
         </div>
 
-        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
+        <div className="bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10">
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">User Cash Liability</p>
             <h2 className="text-2xl font-mono text-white font-bold">
                 ${stats.totalUserCash?.toLocaleString(undefined, {minimumFractionDigits: 2})}
@@ -155,7 +155,7 @@ export default function AdminPage() {
             <p className="text-xs text-gray-500 mt-2">Cash sitting in user wallets</p>
         </div>
 
-        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
+        <div className="bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10">
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Market Liability</p>
             <div className="space-y-1 mt-2">
                 <div className="flex justify-between text-sm">
@@ -169,7 +169,7 @@ export default function AdminPage() {
             </div>
         </div>
 
-        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
+        <div className="bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10">
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">System Health</p>
             <div className="mt-2 flex items-center gap-2">
                 <Activity size={20} className="text-green-500" />
@@ -180,7 +180,7 @@ export default function AdminPage() {
       </div>
 
       {/* USER MANAGER */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+      <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden">
         <div className="p-6 border-b border-gray-700 flex justify-between items-center">
             <h3 className="font-bold text-lg flex items-center gap-2">
                 <Users size={20} className="text-blue-400" /> User Management

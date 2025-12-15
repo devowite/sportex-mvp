@@ -166,7 +166,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
       {/* 1. STATS CARDS (Always Visible) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Net Worth */}
-        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 relative overflow-hidden">
+        <div className="bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet size={64} /></div>
             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Net Worth</p>
             <h2 className="text-3xl font-mono text-white font-bold">
@@ -179,7 +179,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
         </div>
 
         {/* Win Payouts */}
-        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 relative overflow-hidden flex flex-col justify-between">
+        <div className="bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10 relative overflow-hidden flex flex-col justify-between">
             <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={64} /></div>
             <div className="flex justify-between items-start z-10">
                 <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Win Payouts</p>
@@ -208,7 +208,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
         </div>
 
         {/* Allocation */}
-        <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 flex items-center justify-between">
+        <div className="bg-black/40 backdrop-blur-md p-4 rounded-xl border border-white/10 flex items-center justify-between">
             <div>
                 <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Allocation</p>
                 <ul className="text-sm space-y-1 mt-2">
@@ -233,7 +233,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
       </div>
 
       {/* 2. CURRENT HOLDINGS (COLLAPSIBLE) */}
-      <div className="bg-gray-800/30 rounded-xl border border-gray-700/50 overflow-hidden">
+      <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden">
           <button 
             onClick={() => setIsAssetsExpanded(!isAssetsExpanded)}
             className="w-full flex items-center justify-between p-4 hover:bg-gray-800/50 transition bg-gray-900/20"
@@ -267,7 +267,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
 
                         {/* TABLE (Only if Expanded) */}
                         {expandedLeagues[league] && (
-                            <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="bg-black/20 rounded-xl border border-white/10 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
                                 <table className="w-full text-left text-sm text-gray-400">
                                     <thead className="bg-gray-900/50 text-xs uppercase font-bold text-gray-500 border-b border-gray-700">
                                         <tr>
@@ -325,7 +325,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
       </div>
 
       {/* 3. ACTIVITY LOG (COLLAPSIBLE) */}
-      <div className="bg-gray-800/30 rounded-xl border border-gray-700/50 overflow-hidden">
+      <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden">
           <button 
             onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
             className="w-full flex items-center justify-between p-4 hover:bg-gray-800/50 transition bg-gray-900/20"
@@ -346,7 +346,7 @@ export default function Portfolio({ user, holdings, teams }: PortfolioProps) {
                       </div>
                   </div>
 
-                  <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="bg-black/20 rounded-xl border border-white/10 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
                      <table className="w-full text-left text-sm text-gray-400">
                         <thead className="bg-gray-900/50 text-xs uppercase font-bold text-gray-500 border-b border-gray-700">
                             <tr>

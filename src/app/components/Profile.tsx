@@ -59,7 +59,7 @@ export default function Profile({ user, onOpenWallet, onReload }: ProfileProps) 
       </div>
 
       {/* WALLET SECTION */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 flex justify-between items-center">
+      <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 p-6 flex justify-between items-center">
         <div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <CreditCard size={20} className="text-green-400" /> Wallet Balance
@@ -77,7 +77,7 @@ export default function Profile({ user, onOpenWallet, onReload }: ProfileProps) 
       </div>
 
       {/* SETTINGS FORM */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-6">
+      <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 p-6 space-y-6">
         <h3 className="text-lg font-bold text-gray-300 border-b border-gray-700 pb-2">Account Settings</h3>
         
         {/* Username */}
