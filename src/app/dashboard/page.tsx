@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation'; 
 import { LayoutGrid, Briefcase, User, Trophy, CircleDollarSign, ArrowUpDown, LogOut, Shield } from 'lucide-react';
+import MarketTicker from '../components/MarketTicker';
 
 // FIX: Updated imports to point to the parent directory (../)
 import TeamCard from '../components/TeamCard';
@@ -386,6 +387,11 @@ export default function Home() {
                             avgYield={marketStats.avgYield}
                             totalBank={marketStats.totalBank}
                         />
+						{/* --- NEW TICKER ADDED HERE --- */}
+    <MarketTicker 
+        teams={teams} 
+        league={selectedLeague} 
+    />
                         {sortedOwned.length > 0 && (
                             <div>
                                 <h3 className="text-gray-400 text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
