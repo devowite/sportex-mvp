@@ -3,9 +3,7 @@
 export default function SkeletonCard() {
   return (
     <div className="bg-black/20 border border-white/10 rounded-xl overflow-hidden h-[180px] animate-pulse">
-      {/* --- NEW: GENERIC GLOW --- */}
-      <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-10 bg-white pointer-events-none"></div>
-	  
+
 	  {/* Top Color Bar */}
       <div className="h-1.5 w-full bg-white/5"></div>
 

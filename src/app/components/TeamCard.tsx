@@ -459,7 +459,7 @@ return (
       
       {/* --- NEW: AMBIENT GLOW EFFECT --- */}
       <div 
-         className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none"
+         className="absolute -top-20 -left-20 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none"
          style={{ backgroundColor: team.color || '#374151' }}
       ></div>
 
