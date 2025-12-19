@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ChevronDown, ChevronUp, HelpCircle, TrendingUp, TrendingDown, CalendarClock, History, CalendarDays, Lock, Users, X } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-
+import CountUp from 'react-countup';
 
 interface TeamCardProps {
   team: any;
@@ -606,8 +606,14 @@ return (
               <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Price</span>
               <div className="flex items-center gap-2">
                   <span className="font-mono text-white font-bold text-lg">
-                    ${currentPrice.toFixed(2)}
-                  </span>
+    <CountUp 
+        end={currentPrice} 
+        prefix="$" 
+        decimals={2} 
+        duration={0.5} 
+        preserveValue={true} // Prevents resetting to 0 on updates
+    />
+</span>
                   
                   <div className="relative group cursor-help">
                       <div className={`flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>

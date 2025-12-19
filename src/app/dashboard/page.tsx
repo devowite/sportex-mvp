@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation'; 
 import { LayoutGrid, Briefcase, User, CircleDollarSign, ArrowUpDown, LogOut, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import CountUp from 'react-countup';
 
 import TeamCard from '../components/TeamCard';
 import SkeletonCard from '../components/SkeletonCard'; // Ensure this is imported
@@ -360,7 +361,18 @@ export default function Home() {
                 className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/10 cursor-pointer hover:bg-white/5 transition"
             >
                 <CircleDollarSign size={16} className="text-green-400" />
-                <span className="font-mono font-bold text-green-400">${user ? user.usd_balance.toFixed(2) : '---'}</span>
+                <span className="font-mono font-bold text-green-400 min-w-[80px]">
+    {user ? (
+        <CountUp 
+            end={user.usd_balance} 
+            prefix="$" 
+            decimals={2} 
+            separator="," 
+            duration={1} 
+            preserveValue={true}
+        />
+    ) : '---'}
+</span>
             </div>
         </div>
 
