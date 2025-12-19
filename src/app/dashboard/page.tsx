@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation'; 
 import { LayoutGrid, Briefcase, User, Trophy, CircleDollarSign, ArrowUpDown, LogOut, Shield } from 'lucide-react';
 import MarketTicker from '../components/MarketTicker';
+import { toast } from 'sonner';
 
 // FIX: Updated imports to point to the parent directory (../)
 import TeamCard from '../components/TeamCard';
@@ -180,8 +181,12 @@ export default function Home() {
     if (!confirm(`ADMIN: Simulate a WIN for ${teamName}?`)) return;
     const { data, error } = await supabase.rpc('simulate_win', { p_team_id: teamId });
     if (!error) {
-      alert(`PAYOUT SUCCESS!\nTotal Distributed: $${data.payout_total.toFixed(2)}`);
+      toast.success('Payout Distributed!', { 
+        description: `${teamName} win processed. Total paid: $${data.payout_total.toFixed(2)}`
+      });
       reloadData();
+    } else {
+      toast.error('Simulation Failed', { description: error.message });
     }
   };
 

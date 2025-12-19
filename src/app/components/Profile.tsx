@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, Lock, CreditCard, Save, LogOut } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ProfileProps {
   user: any;
@@ -15,15 +16,16 @@ export default function Profile({ user, onOpenWallet, onReload }: ProfileProps) 
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleUpdateProfile = async () => {
+const handleUpdateProfile = async () => {
     setLoading(true);
     
     // 1. Update Username
     if (username !== user.username) {
         const { error } = await supabase.rpc('update_username', { new_name: username });
-        if (error) alert('Error updating name: ' + error.message);
-        else {
-            alert('Username updated!');
+        if (error) {
+            toast.error('Failed to update username', { description: error.message });
+        } else {
+            toast.success('Profile updated', { description: `Username changed to ${username}` });
             onReload();
         }
     }
@@ -31,9 +33,10 @@ export default function Profile({ user, onOpenWallet, onReload }: ProfileProps) 
     // 2. Update Password (if provided)
     if (password) {
         const { error } = await supabase.auth.updateUser({ password: password });
-        if (error) alert('Error updating password: ' + error.message);
-        else {
-            alert('Password updated successfully.');
+        if (error) {
+            toast.error('Failed to update password', { description: error.message });
+        } else {
+            toast.success('Security updated', { description: 'Password changed successfully' });
             setPassword('');
         }
     }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { X, ArrowDownCircle, ArrowUpCircle, CreditCard } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface WalletModalProps {
   balance: number;
@@ -15,39 +16,37 @@ export default function WalletModal({ balance, onClose, onSuccess }: WalletModal
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleTransaction = async (e: React.FormEvent) => {
+const handleTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     const val = parseFloat(amount);
 
     if (val <= 0) {
-        alert("Enter a valid amount.");
+        toast.error("Invalid Amount", { description: "Please enter a value greater than 0." });
         setLoading(false);
         return;
     }
 
     if (activeTab === 'DEPOSIT') {
-        // MVP: Call the simulation function
         const { error } = await supabase.rpc('simulate_deposit', { amount: val });
-        if (error) alert(error.message);
-        else {
-            alert(`Successfully deposited $${val}!`);
+        if (error) {
+            toast.error("Deposit Failed", { description: error.message });
+        } else {
+            toast.success("Deposit Successful", { description: `$${val.toFixed(2)} added to wallet` });
             onSuccess();
             onClose();
         }
     } else {
-        // WITHDRAWAL REQUEST
-        // For MVP, we'll just check balance and pretend to process
+        // WITHDRAWAL LOGIC
         if (val > balance) {
-            alert("Insufficient funds.");
+            toast.error("Insufficient Funds", { description: "You cannot withdraw more than you have." });
         } else {
-            alert("Withdrawal request submitted! (This is a demo - funds remain in account)");
-            // In real life, you'd insert into a 'withdrawals' table here
+            toast.success("Withdrawal Requested", { description: `$${val.toFixed(2)} sent to bank (Demo)` });
             onClose();
         }
     }
     setLoading(false);
-  };
+};
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">

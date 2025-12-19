@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { X, Hash, AlertCircle, Lock, TrendingUp } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface TradeModalProps {
   team: any;
@@ -183,43 +184,56 @@ export default function TradeModal({ team, isOpen, onClose, userId, userBalance,
       }
   };
 
-  const handleExecute = async () => {
+const handleExecute = async () => {
     if (!userId || numAmount <= 0) return;
     setLoading(true);
     setError(null);
 
     try {
-      if (mode === 'BUY') {
-        if (marketStatus === 'CLOSED') throw new Error("Market is closed.");
-        if (totalValue > currentBalance) throw new Error(`Insufficient funds. Need $${totalValue.toFixed(2)}`);
-        
-        const { error } = await supabase.rpc('buy_shares', {
-          p_user_id: userId,
-          p_team_id: team.id,
-          p_amount: numAmount,
-          p_price: avgPrice 
-        });
-        if (error) throw error;
+        if (mode === 'BUY') {
+            if (marketStatus === 'CLOSED') throw new Error("Market is closed.");
+            if (totalValue > currentBalance) throw new Error(`Insufficient funds. Need $${totalValue.toFixed(2)}`);
 
-      } else {
-        if (numAmount > currentShares) throw new Error(`Insufficient shares. You have ${currentShares}.`);
+            const { error } = await supabase.rpc('buy_shares', {
+                p_user_id: userId,
+                p_team_id: team.id,
+                p_amount: numAmount,
+                p_price: avgPrice 
+            });
+            if (error) throw error;
 
-        const { error } = await supabase.rpc('sell_shares', {
-          p_user_id: userId,
-          p_team_id: team.id,
-          p_amount: numAmount
-        });
-        if (error) throw error;
-      }
+            // --- NEW SUCCESS TOAST ---
+            toast.success('Trade Executed', { 
+                description: `Bought ${numAmount} shares of ${team.ticker} for $${totalValue.toFixed(2)}` 
+            });
 
-      if (onSuccess) onSuccess();
-      onClose();
+        } else {
+            if (numAmount > currentShares) throw new Error(`Insufficient shares. You have ${currentShares}.`);
+
+            const { error } = await supabase.rpc('sell_shares', {
+                p_user_id: userId,
+                p_team_id: team.id,
+                p_amount: numAmount
+            });
+            if (error) throw error;
+
+            // --- NEW SUCCESS TOAST ---
+            toast.success('Trade Executed', { 
+                description: `Sold ${numAmount} shares of ${team.ticker} for $${totalValue.toFixed(2)}` 
+            });
+        }
+
+        if (onSuccess) onSuccess();
+        onClose();
     } catch (err: any) {
-      setError(err.message);
+        // Keep the inline error for valid feedback, or use toast.error(err.message)
+        setError(err.message); 
+        // Optional: If you want a toast error INSTEAD of the red box:
+        // toast.error("Trade Failed", { description: err.message });
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
   if (!isOpen) return null;
 
