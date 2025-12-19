@@ -454,14 +454,21 @@ const handleViewHolders = async (e: React.MouseEvent) => {
   // Disable trade button if closed
   const isTradeDisabled = todaysGameInfo?.isClosed;
 
-  return (
-    <div className={`bg-black/20 backdrop-blur-md border border-white/10 rounded-xl transition-all duration-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] relative hover:z-50 ${isExpanded ? 'ring-1 ring-white/20' : 'hover:border-white/20 hover:bg-black/30'}`}>
-      <div className="h-1.5 w-full rounded-t-xl" style={{ backgroundColor: team.color || '#374151' }}></div>
+return (
+    <div className={`bg-black/20 backdrop-blur-md border border-white/10 rounded-xl transition-all duration-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] relative hover:z-50 overflow-hidden ${isExpanded ? 'ring-1 ring-white/20' : 'hover:border-white/20 hover:bg-black/30'}`}>
+      
+      {/* --- NEW: AMBIENT GLOW EFFECT --- */}
+      <div 
+         className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none"
+         style={{ backgroundColor: team.color || '#374151' }}
+      ></div>
+
+      <div className="h-1.5 w-full rounded-t-xl relative z-10" style={{ backgroundColor: team.color || '#374151' }}></div>
 
       {/* --- HEADER --- */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="p-4 cursor-pointer bg-transparent hover:bg-white/5 transition rounded-b-xl"
+        className="p-4 cursor-pointer bg-transparent hover:bg-white/5 transition rounded-b-xl relative z-10"
       >
         <div className="flex justify-between items-start mb-3">
              <div className="flex items-start gap-3 w-full">
@@ -478,9 +485,14 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                 {/* TEAM INFO */}
                 <div className="flex flex-col w-full pr-2">
                     <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-white text-md leading-tight mb-1">
-                            {team.name}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-white text-md leading-tight mb-1">
+                                {team.name}
+                            </h3>
+                            {/* HOT / COLD INDICATOR (Optional if you have it) */}
+                            {/* {StreakIcon && ... } */}
+                        </div>
+
                         {/* MARKET CLOSED INDICATOR */}
                         {todaysGameInfo?.isClosed && (
                             <div className="flex items-center gap-1 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded text-[9px] font-bold text-red-400 animate-pulse">
@@ -499,7 +511,6 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                         {/* --- DYNAMIC STATUS AREA --- */}
                         {todaysGameInfo ? (
                             todaysGameInfo.status === 'live' ? (
-                                // --- LIVE GAME ---
                                 <div className="flex items-center gap-1.5 text-[10px] whitespace-nowrap">
                                     <span className="relative flex h-2 w-2">
                                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -509,7 +520,6 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                                     <span className="text-red-300/70 font-mono hidden sm:inline">{todaysGameInfo.time}</span>
                                 </div>
                             ) : (
-                                // --- FINAL GAME ---
                                 <div className="flex items-center gap-1.5 text-[10px] whitespace-nowrap">
                                     <CalendarClock size={12} className="text-gray-500" />
                                     <span className={`font-bold ${todaysGameInfo.resultColor}`}>
@@ -519,7 +529,6 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                                 </div>
                             )
                         ) : (
-                            // --- PRE GAME (Default) ---
                             <div className="flex items-center gap-1.5 text-[10px] text-blue-300 whitespace-nowrap">
                                 <CalendarClock size={12} />
                                 <span className="font-bold">{team.next_opponent || '--'}</span>
@@ -527,63 +536,60 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                             </div>
                         )}
 
-                        {/* --- SCHEDULE HOVER (Consolidated) --- */}
-<div 
-    className="relative group ml-auto sm:ml-0 z-50"
-    onMouseEnter={handleScheduleHover}
-    onMouseLeave={() => setShowSchedule(false)}
->
-    <span className="flex items-center gap-1 text-[9px] font-bold text-gray-400 hover:text-white transition cursor-help px-1.5 py-0.5">
-        <CalendarDays size={12} /> Schedule
-    </span>
+                        {/* --- SCHEDULE HOVER --- */}
+                        <div 
+                            className="relative group ml-auto sm:ml-0 z-50"
+                            onMouseEnter={handleScheduleHover}
+                            onMouseLeave={() => setShowSchedule(false)}
+                        >
+                            <span className="flex items-center gap-1 text-[9px] font-bold text-gray-400 hover:text-white transition cursor-help px-1.5 py-0.5">
+                                <CalendarDays size={12} /> Schedule
+                            </span>
 
-    {showSchedule && (
-        <div className="absolute bottom-full right-0 sm:left-1/2 sm:-translate-x-1/2 mb-2 w-[340px] bg-gray-950/95 border border-white/10 rounded-lg shadow-2xl z-[100] overflow-hidden flex backdrop-blur-xl">
-            {/* LEFT COL: LAST 5 */}
-            <div className="flex-1 border-r border-white/10">
-                <div className="bg-white/5 px-2 py-1.5 border-b border-white/10 text-[9px] text-gray-400 font-bold text-center uppercase">
-                    Last 5
-                </div>
-                <div className="p-1 space-y-0.5">
-                    {loadingLast5 ? (
-                        <p className="text-[9px] text-gray-600 text-center py-2">Loading...</p>
-                    ) : last5Games.map((g, i) => (
-                        <div key={i} className="flex justify-between items-center text-[10px] px-2 py-1 rounded hover:bg-white/5">
-                            <span className="text-gray-400 font-bold">{g.opp}</span>
-                            <div className="flex gap-2">
-                                <span className="text-gray-500 font-mono">{g.score}</span>
-                                <span className={g.result === 'W' ? 'text-green-400' : 'text-red-400'}>{g.result}</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+                            {showSchedule && (
+                                <div className="absolute bottom-full right-0 sm:left-1/2 sm:-translate-x-1/2 mb-2 w-[340px] bg-gray-950/95 border border-white/10 rounded-lg shadow-2xl z-[100] overflow-hidden flex backdrop-blur-xl">
+                                    {/* LEFT COL: LAST 5 */}
+                                    <div className="flex-1 border-r border-white/10">
+                                        <div className="bg-white/5 px-2 py-1.5 border-b border-white/10 text-[9px] text-gray-400 font-bold text-center uppercase">
+                                            Last 5
+                                        </div>
+                                        <div className="p-1 space-y-0.5">
+                                            {loadingLast5 ? (
+                                                <p className="text-[9px] text-gray-600 text-center py-2">Loading...</p>
+                                            ) : last5Games.map((g, i) => (
+                                                <div key={i} className="flex justify-between items-center text-[10px] px-2 py-1 rounded hover:bg-white/5">
+                                                    <span className="text-gray-400 font-bold">{g.opp}</span>
+                                                    <div className="flex gap-2">
+                                                        <span className="text-gray-500 font-mono">{g.score}</span>
+                                                        <span className={g.result === 'W' ? 'text-green-400' : 'text-red-400'}>{g.result}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
 
-            {/* RIGHT COL: NEXT 5 */}
-            <div className="flex-1">
-                <div className="bg-white/5 px-2 py-1.5 border-b border-white/10 text-[9px] text-blue-300 font-bold text-center uppercase">
-                    Upcoming
-                </div>
-                <div className="p-1 space-y-0.5">
-                    {loadingNext5 ? (
-                        <p className="text-[9px] text-gray-600 text-center py-2">Loading...</p>
-                    ) : next5Games.map((g, i) => (
-                        <div key={i} className="flex justify-between items-center text-[10px] px-2 py-1 rounded hover:bg-white/5">
-                            {/* Opponent + Record Stacked */}
-                            <div className="flex flex-col leading-none gap-0.5">
-                                <span className="text-gray-300 font-bold">{g.opp}</span>
-                                <span className="text-[8px] text-gray-500 font-mono">{g.record}</span>
-                            </div>
-                            
-                            {/* Date */}
-                            <span className="text-gray-500 font-mono">{g.date}</span>
+                                    {/* RIGHT COL: NEXT 5 */}
+                                    <div className="flex-1">
+                                        <div className="bg-white/5 px-2 py-1.5 border-b border-white/10 text-[9px] text-blue-300 font-bold text-center uppercase">
+                                            Upcoming
+                                        </div>
+                                        <div className="p-1 space-y-0.5">
+                                            {loadingNext5 ? (
+                                                <p className="text-[9px] text-gray-600 text-center py-2">Loading...</p>
+                                            ) : next5Games.map((g, i) => (
+                                                <div key={i} className="flex justify-between items-center text-[10px] px-2 py-1 rounded hover:bg-white/5">
+                                                    <div className="flex flex-col leading-none gap-0.5">
+                                                        <span className="text-gray-300 font-bold">{g.opp}</span>
+                                                        <span className="text-[8px] text-gray-500 font-mono">{g.record}</span>
+                                                    </div>
+                                                    <span className="text-gray-500 font-mono">{g.date}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    )}
-</div>
 
                     </div>
                 </div>
@@ -643,7 +649,7 @@ const handleViewHolders = async (e: React.MouseEvent) => {
 
       {/* --- EXPANDED --- */}
       {isExpanded && (
-        <div className="px-4 pb-4 pt-0 animate-in fade-in slide-in-from-top-2 duration-200 bg-gray-800/50 rounded-b-xl">
+        <div className="px-4 pb-4 pt-0 animate-in fade-in slide-in-from-top-2 duration-200 bg-gray-800/50 rounded-b-xl relative z-20">
             
             <div className="h-40 w-full mt-2 mb-4">
                 <ResponsiveContainer width="100%" height="100%">
@@ -684,7 +690,6 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                         <span className="text-gray-400 border-b border-dotted border-gray-600">Liquidity (Reserve)</span>
                         <HelpCircle size={12} className="text-gray-500 hover:text-white" />
                         
-                        {/* The Tooltip */}
                         <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-3 bg-black border border-gray-700 rounded-lg shadow-xl text-[10px] text-gray-300 z-50 pointer-events-none">
                             <p className="mb-1 font-bold text-white">Market Stability</p>
                             This is the cash pool available to buy back shares. Higher liquidity means the price won't crash as hard when players sell.
@@ -713,8 +718,8 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                 )}
             </button>
                 
-{/* --- ADMIN BUTTON --- */}
-{isAdmin && (
+            {/* --- ADMIN BUTTON --- */}
+            {isAdmin && (
                     <button 
                         onClick={handleViewHolders}
                         className="px-3 bg-gray-700 hover:bg-blue-600 text-gray-400 hover:text-white rounded-lg transition flex items-center justify-center"
@@ -730,6 +735,7 @@ const handleViewHolders = async (e: React.MouseEvent) => {
             </div>
         </div>
       )}
+      
       {/* --- ADMIN HOLDERS MODAL --- */}
       {showHolders && (
         <div 
@@ -763,8 +769,8 @@ const handleViewHolders = async (e: React.MouseEvent) => {
                                 {holders.map((h: any, i) => (
                                     <tr key={i} className="hover:bg-gray-800/50">
                                         <td className="px-3 py-2 text-white">
-    {h.user_display}
-</td>
+                                            {h.user_display}
+                                        </td>
                                         <td className="px-3 py-2 text-right font-mono text-blue-300">
                                             {h.shares_owned}
                                         </td>
